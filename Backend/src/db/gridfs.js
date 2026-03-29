@@ -13,7 +13,6 @@ export const connectGridFS = () => {
   bucket = new GridFSBucket(db, {
     bucketName: "reports",
   });
-
   console.log("GridFS bucket ready (reports)");
 };
 

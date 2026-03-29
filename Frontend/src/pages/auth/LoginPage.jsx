@@ -21,25 +21,36 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const { login, error, setError } = useAuth();
+
+  let [role,setRole]=useState("");
+
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
-
-
     e.preventDefault();
-
     setLoading(true);
 
-    const response=await fetch("http://localhost:6001/user/login");
-      
-    setLoading(false);
+
+    if(role=="Super"){
 
 
-    if (res.ok) {
-      if (res.role === "superadmin") navigate("/superadmin");
-      else if (res.role === "admin") navigate("/admin");
-      else navigate("/dashboard");
-    }
+        const response = await fetch("http://localhost:6001/user/loginSuper", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  email,
+                  password,
+                }),
+                credentials: "include",
+              });
+
+        const data=await response.json();
+        console.log(data);    
+        setLoading(false);
+  }
+
 
 
   };
@@ -48,6 +59,7 @@ export default function LoginPage() {
     setEmail(acc.email);
     setPassword(acc.password);
     setError("");
+    setRole(acc.role);
   };
 
   return (

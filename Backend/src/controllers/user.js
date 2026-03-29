@@ -1,7 +1,7 @@
 import { SuperAdmin } from "../models/superAdmin.js";
  
 
-export const userLogin=async(req,res)=>{
+export const superAdminLogin=async(req,res)=>{
        try {
           const {email,password}=req.body;
           if( !email || !password){
@@ -55,7 +55,8 @@ export const superAdminSignUp = async (req, res) => {
  
     const safeAdmin = admin.toObject();
     delete safeAdmin.password;
- 
+
+    // 6. Send response
     return res.status(201).json({
       success: true,
       message: "Super admin created successfully",
