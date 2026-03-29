@@ -2,127 +2,121 @@ import { useState } from "react";
 import { DISEASES, DATA_SOURCES, TRENDS, NOTIFICATIONS, MAP_DOTS } from "../../data/mockData";
 import { CardBox, CardHeader, LiveBadge, SevDot } from "../ui";
 
-/* ── Sidebar ───────────────────────── */
-
 export function DiseaseSidebar() {
   const [active, setActive] = useState(1);
 
   return (
     <div className="flex flex-col gap-4">
-
-      {/* Location */}
       <CardBox>
         <CardHeader icon="📍" title="Your Location" />
 
-        <div className="p-3 flex flex-col gap-2.5">
-
-          <div className="flex items-center gap-2 bg-white border border-slate-300 rounded-lg px-3 py-2 focus-within:ring-2 focus-within:ring-cyan-500">
-            <span className="text-cyan-600 text-sm">🔍</span>
+        <div className="flex flex-col gap-2.5 p-3">
+          <div className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 focus-within:ring-2 focus-within:ring-cyan-500">
+            <span className="text-sm text-cyan-600">🔍</span>
             <input
               defaultValue="Chandigarh, Punjab"
-              className="bg-transparent outline-none text-slate-800 text-xs w-full placeholder-slate-400"
+              className="w-full bg-transparent text-xs text-slate-800 outline-none placeholder-slate-400"
             />
           </div>
 
-          <div className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5">
-            <p className="text-xs text-slate-500 mb-1.5">Risk Level</p>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+            <p className="mb-1.5 text-xs text-slate-500">Risk Level</p>
 
             <div className="flex items-center gap-2">
-              <div className="flex-1 h-1.5 bg-slate-200 rounded-full">
-                <div className="h-full w-[45%] bg-gradient-to-r from-emerald-500 to-yellow-500 rounded-full" />
+              <div className="h-1.5 flex-1 rounded-full bg-slate-200">
+                <div className="h-full w-[45%] rounded-full bg-gradient-to-r from-emerald-500 to-yellow-500" />
               </div>
               <span className="text-xs font-bold text-yellow-600">Moderate</span>
             </div>
           </div>
-
         </div>
       </CardBox>
 
-      {/* Disease list */}
       <CardBox>
         <CardHeader icon="🦠" title="Disease Monitor" />
 
-        <div className="p-1.5 flex flex-col gap-0.5">
-          {DISEASES.map(d => (
+        <div className="flex flex-col gap-0.5 p-1.5">
+          {DISEASES.map((disease) => (
             <button
-              key={d.id}
-              onClick={() => setActive(d.id)}
-              className={`flex items-center gap-2.5 px-3 py-2 rounded-lg border w-full text-left transition
-              ${
-                active === d.id
-                  ? "bg-cyan-50 border-cyan-200 text-cyan-700"
-                  : "border-transparent hover:bg-slate-50 text-slate-600"
+              key={disease.id}
+              onClick={() => setActive(disease.id)}
+              className={`flex w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition ${
+                active === disease.id
+                  ? "border-cyan-200 bg-cyan-50 text-cyan-700"
+                  : "border-transparent text-slate-600 hover:bg-slate-50"
               }`}
             >
-              <span className={`w-2 h-2 rounded-full ${d.dot}`} />
-              <span className="text-xs font-medium flex-1">{d.name}</span>
+              <span className={`h-2 w-2 rounded-full ${disease.dot}`} />
+              <span className="flex-1 text-xs font-medium">{disease.name}</span>
 
-              <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
-                {d.cases}
+              <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-bold text-slate-600">
+                {disease.cases}
               </span>
             </button>
           ))}
         </div>
       </CardBox>
-
-      {/* Sources */}
-      <CardBox>
-        <CardHeader icon="🌐" title="Data Sources" />
-
-        {DATA_SOURCES.map((s, i) => (
-          <div
-            key={s.id}
-            className={`flex items-center gap-2.5 px-4 py-2.5 ${
-              i < DATA_SOURCES.length - 1 ? "border-b border-slate-200" : ""
-            }`}
-          >
-            <span>{s.icon}</span>
-
-            <span className="text-xs text-slate-600 flex-1">
-              {s.name}
-            </span>
-
-            <span className={`text-xs font-semibold ${
-              s.status === "synced" ? "text-emerald-600" : "text-yellow-600"
-            }`}>
-              {s.status === "synced" ? "✓ Synced" : "⟳ Pending"}
-            </span>
-          </div>
-        ))}
-      </CardBox>
-
     </div>
   );
 }
 
-/* ── Map ───────────────────────── */
+export function DataSourcesPanel() {
+  return (
+    <CardBox>
+      <CardHeader icon="🌐" title="Data Sources" />
+
+      {DATA_SOURCES.map((source, index) => (
+        <div
+          key={source.id}
+          className={`flex items-center gap-2.5 px-4 py-2.5 ${
+            index < DATA_SOURCES.length - 1 ? "border-b border-slate-200" : ""
+          }`}
+        >
+          <span>{source.icon}</span>
+
+          <span className="flex-1 text-xs text-slate-600">
+            {source.name}
+          </span>
+
+          <span
+            className={`text-xs font-semibold ${
+              source.status === "synced" ? "text-emerald-600" : "text-yellow-600"
+            }`}
+          >
+            {source.status === "synced" ? "✓ Synced" : "⟳ Pending"}
+          </span>
+        </div>
+      ))}
+    </CardBox>
+  );
+}
 
 export function OutbreakMap() {
   return (
     <CardBox>
       <CardHeader icon="🗺️" title="Outbreak Map" />
 
-      <div className="relative h-40 bg-slate-100 overflow-hidden">
-
-        <div className="absolute inset-0 opacity-40"
+      <div className="relative h-40 overflow-hidden bg-slate-100">
+        <div
+          className="absolute inset-0 opacity-40"
           style={{
             backgroundImage:
               "linear-gradient(rgba(200,200,200,0.5) 1px,transparent 1px),linear-gradient(90deg,rgba(200,200,200,0.5) 1px,transparent 1px)",
-            backgroundSize: "20px 20px"
+            backgroundSize: "20px 20px",
           }}
         />
 
-        {MAP_DOTS.map(d => (
+        {MAP_DOTS.map((dot) => (
           <span
-            key={d.id}
+            key={dot.id}
             className="absolute rounded-full"
             style={{
-              top: d.top,
-              left: d.left,
-              width: d.size,
-              height: d.size,
-              background: d.color,
-              transform: "translate(-50%,-50%)"
+              top: dot.top,
+              left: dot.left,
+              width: dot.size,
+              height: dot.size,
+              background: dot.color,
+              transform: "translate(-50%,-50%)",
             }}
           />
         ))}
@@ -135,78 +129,67 @@ export function OutbreakMap() {
   );
 }
 
-/* ── Trends ───────────────────────── */
-
 export function WeeklyTrend() {
   return (
     <CardBox>
       <CardHeader icon="📈" title="Weekly Trend" />
 
-      <div className="p-3 flex flex-col gap-3">
-        {TRENDS.map(t => (
-          <div key={t.id} className="flex items-center gap-3">
-
-            <span className="text-xs text-slate-600 flex-1">
-              {t.name}
+      <div className="flex flex-col gap-3 p-3">
+        {TRENDS.map((trend) => (
+          <div key={trend.id} className="flex items-center gap-3">
+            <span className="flex-1 text-xs text-slate-600">
+              {trend.name}
             </span>
 
-            <div className="flex items-end gap-0.5 h-5">
-              {t.bars.map((b, i) => (
+            <div className="flex h-5 items-end gap-0.5">
+              {trend.bars.map((bar, index) => (
                 <div
-                  key={i}
-                  className={`w-1 rounded ${t.up ? "bg-red-500" : "bg-emerald-500"}`}
-                  style={{ height: `${Math.round((b / 14) * 20)}px` }}
+                  key={index}
+                  className={`w-1 rounded ${trend.up ? "bg-red-500" : "bg-emerald-500"}`}
+                  style={{ height: `${Math.round((bar / 14) * 20)}px` }}
                 />
               ))}
             </div>
 
-            <span className={`text-xs font-bold ${
-              t.up ? "text-red-600" : "text-emerald-600"
-            }`}>
-              {t.pct}
+            <span className={`text-xs font-bold ${trend.up ? "text-red-600" : "text-emerald-600"}`}>
+              {trend.pct}
             </span>
-
           </div>
         ))}
       </div>
     </CardBox>
   );
 }
-
-/* ── Notifications ───────────────────────── */
 
 export function NotificationPanel() {
   return (
     <CardBox>
       <CardHeader icon="🔔" title="Notifications" right={<LiveBadge label="3 new" />} />
 
-      <div className="p-2 flex flex-col gap-1.5">
-        {NOTIFICATIONS.map(n => (
+      <div className="flex flex-col gap-1.5 p-2">
+        {NOTIFICATIONS.map((notification) => (
           <div
-            key={n.id}
-            className={`flex items-start gap-2.5 p-2.5 rounded-xl border transition
-            ${
-              n.urgent
-                ? "bg-red-50 border-red-200"
-                : "bg-white border-slate-200 hover:bg-slate-50"
+            key={notification.id}
+            className={`flex items-start gap-2.5 rounded-xl border p-2.5 transition ${
+              notification.urgent
+                ? "border-red-200 bg-red-50"
+                : "border-slate-200 bg-white hover:bg-slate-50"
             }`}
           >
-            <span>{n.icon}</span>
+            <span>{notification.icon}</span>
 
             <div className="flex-1">
-              <p className={`text-xs font-semibold ${
-                n.urgent ? "text-red-600" : "text-slate-800"
-              }`}>
-                {n.title}
+              <p className={`text-xs font-semibold ${notification.urgent ? "text-red-600" : "text-slate-800"}`}>
+                {notification.title}
               </p>
 
               <p className="text-xs text-slate-500">
-                {n.body}
+                {notification.body}
               </p>
             </div>
 
             <span className="text-xs text-slate-400">
-              {n.time}
+              {notification.time}
             </span>
           </div>
         ))}
@@ -215,36 +198,29 @@ export function NotificationPanel() {
   );
 }
 
-/* ── SOS ───────────────────────── */
-
 export function SOSButton({ onPress }) {
   return (
-    <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-center">
-
+    <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-center">
       <button
         onClick={onPress}
-        className="w-full py-3 rounded-xl font-bold text-white bg-red-500 hover:bg-red-600 transition"
+        className="w-full rounded-xl bg-red-500 py-3 font-bold text-white transition hover:bg-red-600"
       >
         🚨 SOS Emergency
       </button>
 
-      <p className="text-xs text-slate-500 mt-2">
+      <p className="mt-2 text-xs text-slate-500">
         Tap for nearest help
       </p>
-
     </div>
   );
 }
 
-/* ── Right Panel ───────────────────────── */
-
-export function RightPanel({ onSOS }) {
+export function RightPanel({ onSOS, showSOS = true }) {
   return (
     <div className="flex flex-col gap-4">
       <OutbreakMap />
       <WeeklyTrend />
-      {/* <NotificationPanel /> */}
-      <SOSButton onPress={onSOS} />
+      {showSOS && <SOSButton onPress={onSOS} />}
     </div>
   );
 }
