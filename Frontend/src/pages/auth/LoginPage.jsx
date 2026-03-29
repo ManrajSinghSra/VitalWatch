@@ -4,9 +4,9 @@ import { useAuth } from "../../context/AuthContext";
 import { Input, PrimaryBtn } from "../../components/ui";
 
 const DEMO_ACCOUNTS = [
-  { role: "User", email: "user@demo.com", password: "user123", icon: "👤" },
+  { role: "User", email: "man@m.com", password: "123456", icon: "👤" },
   { role: "Admin", email: "admin@demo.com", password: "admin123", icon: "🛠️" },
-  { role: "Super", email: "super@demo.com", password: "super123", icon: "🧠" },
+  { role: "Super", email: "manraj@g.com", password: "12345678", icon: "🧠" },
 ];
 
 const FLOATING_ITEMS = [
@@ -22,38 +22,28 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const { login, error, setError } = useAuth();
 
-  let [role,setRole]=useState("");
+  const [role,setRole]=useState("");
 
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
+      e.preventDefault();
+ 
+      if (!email || !password) {
+        setError("Email and password required");
+        return;
+      }
+      setLoading(true);
+      const res = await login(email, password,role);
+      setLoading(false);
+      console.log(res);
+      if (res.ok) {
+        if (res.role === "superadmin") navigate("/superadmin");
+        else if (res.role === "admin") navigate("/admin");
+        else navigate("/dashboard");
+      }
+};
 
-
-    if(role=="Super"){
-
-
-        const response = await fetch("http://localhost:6001/user/loginSuper", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  email,
-                  password,
-                }),
-                credentials: "include",
-              });
-
-        const data=await response.json();
-        console.log(data);    
-        setLoading(false);
-  }
-
-
-
-  };
 
   const fillDemo = (acc) => {
     setEmail(acc.email);

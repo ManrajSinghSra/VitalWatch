@@ -21,18 +21,45 @@ export default function SignupPage() {
     return e;
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const errs = validate();
-    if (Object.keys(errs).length) {
-      setErrors(errs);
-      return;
-    }
+const handleSubmit = async (e) => {
+  e.preventDefault();
+
+  const errs = validate();
+  if (Object.keys(errs).length) {
+    setErrors(errs);
+    return;
+  }
+
+  try {
     setLoading(true);
-    await new Promise(r => setTimeout(r, 800));
-    setLoading(false);
+
+    const response = await fetch("http://localhost:6001/user/signUpUser", {
+      method: "POST",
+      credentials:"include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: form.name,
+        email: form.email,
+        password: form.password,
+        location: form.location,
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || "Signup failed");
+    }
+    console.log("Created user:", data.user);
     navigate("/login");
-  };
+
+  } catch (err) {
+    console.error(err.message);
+    setErrors({ api: err.message });
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4 relative overflow-hidden py-12">
