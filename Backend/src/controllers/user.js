@@ -1,7 +1,7 @@
 import { SuperAdmin } from "../models/superAdmin.js";
  
 
-export const superAdminLogin=async(req,res)=>{
+export const userLogin=async(req,res)=>{
        try {
           const {email,password}=req.body;
           if( !email || !password){

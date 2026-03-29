@@ -24,16 +24,24 @@ export default function LoginPage() {
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
+
+
     e.preventDefault();
+
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 600));
-    const res = login(email, password);
+
+    const response=await fetch("http://localhost:6001/user/login");
+      
     setLoading(false);
+
+
     if (res.ok) {
       if (res.role === "superadmin") navigate("/superadmin");
       else if (res.role === "admin") navigate("/admin");
       else navigate("/dashboard");
     }
+
+
   };
 
   const fillDemo = (acc) => {
