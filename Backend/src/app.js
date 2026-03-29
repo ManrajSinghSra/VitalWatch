@@ -6,6 +6,7 @@ export const app=express()
 
  
 import { reportRouter } from "./routers/reportProcessing.js"
+import { userRouter } from "./routers/usersLogin.js"
 
 app.use(express.json())
 app.use(cookie())
@@ -17,6 +18,6 @@ app.use(cors({
     
 app.use("/report",reportRouter);
 
-app.use("/login",)
+app.use("/user",userRouter)
 
  

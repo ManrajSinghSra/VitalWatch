@@ -68,7 +68,5 @@ superAdminSchema.methods.getToken = async function () {
   });
   return token;
 };
-
-
  
 export const SuperAdmin = mongoose.model("SuperAdmin", superAdminSchema);
