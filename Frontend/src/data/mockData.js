@@ -85,16 +85,57 @@ export const SUPERADMIN_SYSTEM = {
 };
 
 export const getBotResponse = (input) => {
-  const l = input.toLowerCase();
+  const text = input.toLowerCase().trim();
 
-  if (l.includes("dengue") || l.includes("mosquito"))
-    return { type: "list",    text: "🦟 **Dengue Alert — Chandigarh & Mohali**\n\nNCDC-recommended precautions:", items: ["Use DEET-based repellent, especially at dawn/dusk", "Wear full-sleeve clothing during peak mosquito hours", "Eliminate stagnant water around your home weekly", "Use bed nets — Aedes mosquitoes bite in daytime too", "Seek care immediately if fever + rash + joint pain"], follow: "Dengue cases are **+24% this week** in your district. Should I set up daily alerts? 🔔" };
+  if (!text) {
+    return {
+      text: "I am here. Ask me anything about health, symptoms, prevention, or general care.",
+    };
+  }
 
-  if (l.includes("summary") || l.includes("report") || l.includes("week"))
-    return { type: "bullets",  text: "📊 **IDSP Week 12 Summary — Punjab & Haryana**", items: ["**Dengue (312 cases)**: Highest burden in Mohali–Panchkula corridor.", "**Influenza H3N2 (189 cases)**: Seasonal surge, elderly & children at risk.", "**Typhoid (97 cases)**: Linked to contaminated water in 3 Jalandhar wards.", "**Cholera Watch**: 11 suspected cases in rural Punjab — under investigation."], follow: "Sourced from IDSP, WHO India & State Directorate. Last updated: Today, 9:00 AM." };
+  if (["hi", "hey", "hello", "hii", "hey there"].some((greeting) => text === greeting || text.startsWith(`${greeting} `))) {
+    return {
+      text: "Hey! I'm Mr.Vital. How can I help you today?",
+    };
+  }
 
-  if (l.includes("precaution") || l.includes("prevent") || l.includes("safe"))
-    return { type: "list",    text: "🛡️ **General Precautions — Chandigarh Region**", items: ["Boil or purify drinking water — typhoid risk elevated", "Use mosquito protection — dengue is at seasonal peak", "Wash hands frequently — flu is airborne", "Avoid crowded spaces if symptomatic", "Keep vaccinations up to date (flu, typhoid)"], follow: "Want a location-specific risk report? Share your exact district." };
+  if (text.includes("how are you")) {
+    return {
+      text: "I'm doing well and ready to help. Tell me what health question you have.",
+    };
+  }
 
-  return { type: "card", text: "Based on **IDSP Week 12 Report**, here are active disease alerts near you:", card: { title: "🦠 Disease Risk — Chandigarh Region", risks: [{ label: "Dengue", val: 72, bar: "bg-red-500" }, { label: "Influenza", val: 55, bar: "bg-yellow-400" }, { label: "Typhoid", val: 38, bar: "bg-orange-400" }, { label: "Cholera", val: 15, bar: "bg-purple-400" }] }, follow: "Dengue is the highest concern this week. Want **precautions**, **health centers**, or a **full report**?" };
+  if (text.includes("dengue")) {
+    return {
+      text: "Dengue usually causes high fever, headache, body pain, nausea, and sometimes rash. Drink fluids, rest, and see a doctor if symptoms get worse.",
+    };
+  }
+
+  if (text.includes("fever")) {
+    return {
+      text: "For fever, rest, drink plenty of fluids, and monitor your temperature. If it stays high, lasts more than a couple of days, or comes with breathing trouble, confusion, or severe weakness, get medical help.",
+    };
+  }
+
+  if (text.includes("cough") || text.includes("cold") || text.includes("flu")) {
+    return {
+      text: "For cough or flu-like symptoms, rest, hydrate well, and avoid close contact with others. If you have chest pain, breathing trouble, or symptoms are getting worse, please see a doctor.",
+    };
+  }
+
+  if (text.includes("hospital") || text.includes("doctor") || text.includes("clinic")) {
+    return {
+      text: "If you need care, I can help with general guidance, but for urgent symptoms it is best to visit the nearest hospital or clinic as soon as possible.",
+    };
+  }
+
+  if (text.includes("prevent") || text.includes("precaution") || text.includes("safe")) {
+    return {
+      text: "Basic prevention steps are washing hands regularly, drinking clean water, avoiding stagnant water, eating safe food, and seeking care early if symptoms appear.",
+    };
+  }
+
+  return {
+    text: "I can help with symptoms, prevention, common illnesses, first-aid basics, and general healthcare questions. Tell me what you want to know.",
+  };
 };
