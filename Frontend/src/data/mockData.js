@@ -21,8 +21,6 @@ export const DISEASES = [
 export const DATA_SOURCES = [
   { id: 1, name: "IDSP Weekly Report", icon: "🏥", status: "synced"  },
   { id: 2, name: "WHO India Bulletin", icon: "🌐", status: "synced"  },
-  { id: 3, name: "NCDC Surveillance",  icon: "🔬", status: "synced"  },
-  { id: 4, name: "State Health Dept.", icon: "📋", status: "pending" },
 ];
 
 export const TRENDS = [

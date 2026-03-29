@@ -58,11 +58,11 @@ export default function ChatWindow() {
   };
 
   return (
-    <div className="flex flex-col bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden"
+    <div className="flex flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white/88 shadow-[0_18px_44px_rgba(15,23,42,0.08)]"
          style={{ height: "calc(100vh - 200px)", minHeight: 520 }}>
 
       {/* Topbar */}
-      <div className="flex items-center justify-between px-5 py-3 bg-slate-50 border-b border-slate-200">
+      <div className="flex items-center justify-between border-b border-slate-200/80 bg-white/70 px-5 py-3">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-cyan-100 border border-cyan-200 flex items-center justify-center">
             🤖
@@ -88,14 +88,14 @@ export default function ChatWindow() {
       />
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-4 bg-slate-50">
+      <div className="flex flex-1 flex-col gap-4 overflow-y-auto bg-slate-50/72 px-5 py-4">
         {messages.map(m => <MessageBubble key={m.id} {...m} />)}
         {typing && <TypingIndicator />}
         <div ref={endRef} />
       </div>
 
       {/* Input */}
-      <div className="px-5 py-4 border-t border-slate-200 bg-white">
+      <div className="border-t border-slate-200/80 bg-white/76 px-5 py-4">
 
         <div className="flex items-end gap-2 bg-white border border-slate-300 rounded-xl px-3 py-2.5 focus-within:ring-2 focus-within:ring-cyan-500">
 
