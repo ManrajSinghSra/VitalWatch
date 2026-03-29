@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Navbar from "../../components/layout/Navbar";
 import { StatCard, Badge, CardBox, CardHeader, AvatarCircle, PrimaryBtn, GhostBtn, IconBtn } from "../../components/ui";
 import { ADMIN_USERS, ADMIN_REPORTS, ALERTS, TRENDS } from "../../data/mockData";
@@ -12,6 +12,24 @@ const ADMIN_TABS = [
 
 export default function AdminDashboard() {
   const [tab, setTab] = useState("overview");
+  const [report,setReport]=useState([]);
+
+  const getAllReports=async()=>{
+
+    const reports=await fetch("http://localhost:6001/report/all");
+    const response=await reports.json();
+
+    if(reports.status==200){
+         setReport(response.reports);
+    }
+    else{
+      console.log("error");
+    }
+  }
+
+  useEffect(()=>{
+    getAllReports()
+  },[])
  
 
   const handleFileUpload = async (e) => {
@@ -174,7 +192,7 @@ export default function AdminDashboard() {
           </div>
 
 
-            {ADMIN_REPORTS.map(r => (
+            {report.map(r => (
               <div key={r.id} className="flex items-center gap-4 px-4 py-4 border-b border-slate-200 last:border-0">
                 
                 <div className="w-9 h-9 bg-cyan-100 rounded-lg flex items-center justify-center">
@@ -182,7 +200,7 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="flex-1">
-                  <p className="font-semibold">{r.title}</p>
+                  <p className="font-semibold">{r.originalName}</p>
                   <p className="text-xs text-slate-500">{r.source}</p>
                 </div>
 

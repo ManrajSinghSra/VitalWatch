@@ -7,7 +7,7 @@ const SA_TABS = [
   { key: "overview", label: "Overview",    icon: "👑" },
   { key: "users",    label: "All Users",   icon: "👥" },
   { key: "admins",   label: "Admins",      icon: "🛠️" },
-  { key: "system",   label: "System",      icon: "⚙️" },
+  // { key: "system",   label: "System",      icon: "⚙️" },
   { key: "logs",     label: "Audit Logs",  icon: "📜" },
 ];
 
@@ -88,7 +88,7 @@ export default function SuperAdminDashboard() {
                 </div>
 
                 
-                <CardBox>
+                {/* <CardBox>
                   <CardHeader icon="💻" title="System Health" right={<span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse inline-block" />} />
                   <div className="p-4 flex flex-col gap-3">
                     {SYS_METRICS.map(m => (
@@ -103,11 +103,12 @@ export default function SuperAdminDashboard() {
                       </div>
                     ))}
                   </div>
-                </CardBox>
+                </CardBox> */}
+
               </div>
 
                
-              <CardBox>
+              {/* <CardBox>
                 <CardHeader icon="🌐" title="Data Source Pipeline" />
                 <div className="grid grid-cols-4 gap-0 divide-x divide-edge">
                   {DATA_SOURCES.map(s => (
@@ -119,7 +120,7 @@ export default function SuperAdminDashboard() {
                     </div>
                   ))}
                 </div>
-              </CardBox>
+              </CardBox> */}
 
               
               <CardBox>
@@ -240,10 +241,10 @@ export default function SuperAdminDashboard() {
           )}
 
           
-          {tab === "system" && (
+          {/* {tab === "system" && (
             <div className="animate-fadeUp flex flex-col gap-6">
               <div className="grid grid-cols-2 gap-4">
-                {/* System metrics */}
+               
                 <CardBox>
                   <CardHeader icon="💻" title="Infrastructure Health" />
                   <div className="p-4 flex flex-col gap-4">
@@ -303,7 +304,7 @@ export default function SuperAdminDashboard() {
                 </div>
               </CardBox>
             </div>
-          )}
+          )} */}
 
           
           {tab === "logs" && (
