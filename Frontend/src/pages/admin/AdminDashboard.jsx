@@ -22,7 +22,7 @@ export default function AdminDashboard() {
         const formData = new FormData();
         formData.append("file", selectedFile);
 
-        await fetch("/report/upload", {
+        await fetch("http://localhost:6001/report/upload", {
           method: "POST",
           body: formData,
         });
