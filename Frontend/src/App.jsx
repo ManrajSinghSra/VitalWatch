@@ -4,8 +4,8 @@ import ProtectedRoute from "./routes/ProtectedRoute";
 import ToastContainer from "./components/ui/Toast";
  
 import LandingPage          from "./pages/LandingPage";
-import LoginPage            from "./pages/auth/LoginPage";
-import SignupPage           from "./pages/auth/SignupPage";
+import LoginPage            from "./pages/auth/LoginPage";  
+import SignupPage           from "./pages/auth/SignupPage";   
 import UnauthorizedPage     from "./pages/auth/UnauthorizedPage";
 import UserDashboard        from "./pages/user/UserDashboard";
 import AdminDashboard       from "./pages/admin/AdminDashboard";
