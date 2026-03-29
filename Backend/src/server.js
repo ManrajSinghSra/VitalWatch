@@ -1,17 +1,19 @@
-import "dotenv/config.js"
-import http from "http"
+import "dotenv/config";
+import http from "http";
 
-import { connetDB } from "./db/db.js"
-import {app} from "./app.js"
+import { connectDB } from "./db/db.js";
+import { app } from "./app.js";
 
-const server=http.createServer(app)
-const port=process.env.PORT
+const server = http.createServer(app);
+const port = 6001;
 
+const turboEngine = async () => {
+  await connectDB();
+  console.log("Database Connected");
 
-const turboEngine=async()=>{
-   await connetDB()
-    console.log("Database Connected");
-    server.listen(port,()=>console.log("Working on Port "+port))
-}
+  server.listen(port, () => {
+    console.log("Working on Port " + port);
+  });
+};
 
-turboEngine()
+turboEngine();
