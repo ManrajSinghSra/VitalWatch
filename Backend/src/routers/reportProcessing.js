@@ -12,9 +12,8 @@ const storage = multer.memoryStorage();
 
 const upload = multer({
   storage,
-  limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB max
-  fileFilter: (req, file, cb) => {
-    // only allow PDFs and common doc types
+  limits: { fileSize: 20 * 1024 * 1024 },  
+  fileFilter: (req, file, cb) => { 
     const allowed = ["application/pdf", "application/msword",
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
     if (allowed.includes(file.mimetype)) {
