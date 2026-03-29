@@ -281,15 +281,21 @@ export default function UserDashboard() {
         </div>
       </div>
 
-      <div className="relative z-10 mx-auto grid w-full max-w-[1280px] flex-1 gap-4 px-8 pb-12 xl:grid-cols-[240px_minmax(0,1fr)_300px]">
+      <div className="relative z-10 mx-auto grid w-full max-w-[1280px] flex-1 gap-4 px-8 pb-12 xl:grid-cols-[240px_minmax(0,1fr)_300px] xl:grid-rows-[auto_auto]">
         <DiseaseSidebar />
-        <div className="xl:col-span-2">
+        <div className="w-full xl:col-span-2">
           <ChatWindow />
         </div>
 
-        <DataSourcesPanel />
-        <OutbreakMap />
-        <WeeklyTrend />
+        <div className="xl:col-start-1 xl:row-start-2">
+          <DataSourcesPanel />
+        </div>
+        <div className="xl:col-start-2 xl:row-start-2">
+          <OutbreakMap />
+        </div>
+        <div className="xl:col-start-3 xl:row-start-2">
+          <WeeklyTrend />
+        </div>
       </div>
 
       <div className="relative z-10 mx-auto w-full max-w-[1280px] px-8 pb-8">
