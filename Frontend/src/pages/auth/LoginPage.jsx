@@ -4,9 +4,9 @@ import { useAuth } from "../../context/AuthContext";
 import { Input, PrimaryBtn } from "../../components/ui";
 
 const DEMO_ACCOUNTS = [
-  { role: "User", email: "man@m.com", password: "123456", icon: "👤" },
-  { role: "Admin", email: "admin@demo.com", password: "admin123", icon: "🛠️" },
-  { role: "Super", email: "manraj@g.com", password: "12345678", icon: "🧠" },
+  { role: "User", email: "john@gmail.com", password: "123456", icon: "👤" },
+  { role: "Admin", email: "manraj@gmail.com", password: "123456", icon: "🛠️" },
+  { role: "Super", email: "superadmin@vitalwatch.in", password: "12345678", icon: "🧠" },
 ];
 
 const FLOATING_ITEMS = [
@@ -21,8 +21,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const { login, error, setError } = useAuth();
-
-  const [role,setRole]=useState("");
+ 
 
   const navigate = useNavigate();
 
@@ -34,7 +33,7 @@ export default function LoginPage() {
         return;
       }
       setLoading(true);
-      const res = await login(email, password,role);
+      const res = await login(email, password);
       setLoading(false);
       console.log(res);
       if (res.ok) {

@@ -6,7 +6,10 @@ export const app=express()
 
  
 import { reportRouter } from "./routers/reportProcessing.js"
-import { userRouter } from "./routers/usersLogin.js"
+// import { userRouter } from "./routers/usersLogin.js"
+// import { adminRouter } from "./routers/admin.router.js"
+import { superAdminRouter } from "./routers/superadmin.router.js"
+import { authRouter } from "./routers/auth.router.js"
 
 app.use(express.json())
 app.use(cookie())
@@ -17,8 +20,13 @@ app.use(cors({
   }))
     
 app.use("/report",reportRouter);
+ 
 
-app.use("/user",userRouter)
+
+app.use("/auth",       authRouter);
+app.use("/superadmin", superAdminRouter);
+// app.use("/admin",      adminRouter);
+// app.use("/user",       userRouter);
 
 
 

@@ -66,14 +66,7 @@ export const ADMIN_USERS = [
   { id: 4, name: "Dev Kapoor",     email: "dev@idsp.gov",     role: "user",  status: "inactive", joined: "Feb 2024", location: "Amritsar"    },
   { id: 5, name: "Meera Joshi",    email: "meera@health.gov", role: "admin", status: "active",   joined: "Dec 2023", location: "Mohali"      },
 ];
-
-export const ADMIN_REPORTS = [
-  { id: 1, title: "IDSP Week 12 Summary",   source: "IDSP",  date: "29 Mar 2026", status: "processed", alerts: 3 },
-  { id: 2, title: "WHO India Bulletin #48", source: "WHO",   date: "27 Mar 2026", status: "processed", alerts: 1 },
-  { id: 3, title: "Punjab State Report Q1", source: "State", date: "25 Mar 2026", status: "pending",   alerts: 0 },
-  { id: 4, title: "NCDC Surveillance #201", source: "NCDC",  date: "22 Mar 2026", status: "processed", alerts: 2 },
-];
-
+ 
 export const SUPERADMIN_SYSTEM = {
   uptime: "99.97%",
   apiCalls: "142,830",

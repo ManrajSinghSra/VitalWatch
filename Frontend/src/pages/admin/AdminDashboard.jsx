@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import Navbar from "../../components/layout/Navbar";
 import { StatCard, Badge, CardBox, CardHeader, AvatarCircle, PrimaryBtn, GhostBtn, IconBtn } from "../../components/ui";
-import { ADMIN_USERS, ADMIN_REPORTS, ALERTS, TRENDS } from "../../data/mockData";
+import { ADMIN_USERS, ALERTS, TRENDS } from "../../data/mockData";
 
 const ADMIN_TABS = [
   { key: "overview", label: "Overview", icon: "📊" },

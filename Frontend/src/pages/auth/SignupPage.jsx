@@ -33,7 +33,7 @@ const handleSubmit = async (e) => {
   try {
     setLoading(true);
 
-    const response = await fetch("http://localhost:6001/user/signUpUser", {
+    const response = await fetch("http://localhost:6001/auth/register", {
       method: "POST",
       credentials:"include",
       headers: {
@@ -43,6 +43,7 @@ const handleSubmit = async (e) => {
         name: form.name,
         email: form.email,
         password: form.password,
+        confirmPassword:form.confirm,
         location: form.location,
       }),
     });
@@ -50,7 +51,7 @@ const handleSubmit = async (e) => {
     if (!response.ok) {
       throw new Error(data.message || "Signup failed");
     }
-    console.log("Created user:", data.user);
+    console.log("Created user:", data.data);
     navigate("/login");
 
   } catch (err) {
