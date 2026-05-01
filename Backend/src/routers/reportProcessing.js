@@ -27,7 +27,7 @@ const upload = multer({
 
 export const reportRouter = Router();
  
-reportRouter.post("/upload", verifyToken, isAdmin, upload.single("file"), uploadFile);
+// reportRouter.post("/upload", verifyToken, isAdmin, upload.single("file"), uploadFile);
  
 reportRouter.get("/all", getAllReports);
  

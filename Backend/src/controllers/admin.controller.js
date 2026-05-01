@@ -1,10 +1,10 @@
-// controllers/admin.controller.js
 import { Readable } from "stream";
 import { User } from "../models/User.js";
 import { Report } from "../models/Report.js";
 import { AuditLog } from "../models/AuditLog.js";
 import { getBucket } from "../db/gridfs.js";
 import { incrementReportsProcessed } from "../utils/updateStats.js";
+import { ingestReport } from "../services/rag/ingest.service.js"; // 🔥 ADDED
 
 const hasAdminPermission = (user, permission) => {
   if (user?.role === "superadmin") return true;
@@ -37,42 +37,56 @@ export const uploadReport = async (req, res) => {
 
     // save metadata to reports collection
     const report = await Report.create({
-      originalName:  file.originalname,
-      gridfsFileId:  uploadStream.id,
-      mimeType:      file.mimetype,
-      sizeBytes:     file.size,
+      originalName: file.originalname,
+      gridfsFileId: uploadStream.id,
+      mimeType: file.mimetype,
+      sizeBytes: file.size,
       source,
       description,
-      status:        "uploaded",
-      uploadedBy:    req.user._id,
+      status: "uploaded",
+      uploadedBy: req.user._id,
     });
+
+    // 🔥🔥🔥 ADD THIS BLOCK (RAG ingestion)
+    console.log("🔥 Starting RAG ingestion...");
+
+    ingestReport(report)
+      .then(() => {
+        console.log(`✅ RAG processed: ${report.originalName}`);
+      })
+      .catch((err) => {
+        console.error("❌ RAG ingestion failed:", err.message);
+      });
 
     // update superadmin stats
     await incrementReportsProcessed();
 
     // audit log
     await AuditLog.create({
-      level:         "INFO",
-      action:        `Admin uploaded report: ${file.originalname}`,
-      performedBy:   req.user.name,
+      level: "INFO",
+      action: `Admin uploaded report: ${file.originalname}`,
+      performedBy: req.user.name,
       performedById: req.user._id,
     });
 
     return res.status(201).json({
       message: "Report uploaded successfully",
       report: {
-        id:           report._id,
+        id: report._id,
         originalName: report.originalName,
-        source:       report.source,
-        status:       report.status,
-        sizeBytes:    report.sizeBytes,
-        createdAt:    report.createdAt,
+        source: report.source,
+        status: report.status,
+        sizeBytes: report.sizeBytes,
+        createdAt: report.createdAt,
       },
     });
 
   } catch (err) {
     console.error("Upload error:", err);
-    return res.status(500).json({ message: "Upload failed", error: err.message });
+    return res.status(500).json({
+      message: "Upload failed",
+      error: err.message,
+    });
   }
 };
 
@@ -139,9 +153,9 @@ export const updateReportStatus = async (req, res) => {
     if (!report) return res.status(404).json({ message: "Report not found" });
 
     await AuditLog.create({
-      level:         "INFO",
-      action:        `Report status updated to "${status}": ${report.originalName}`,
-      performedBy:   req.user.name,
+      level: "INFO",
+      action: `Report status updated to "${status}": ${report.originalName}`,
+      performedBy: req.user.name,
       performedById: req.user._id,
     });
 
@@ -160,23 +174,19 @@ export const deleteReport = async (req, res) => {
     const report = await Report.findById(req.params.id);
     if (!report) return res.status(404).json({ message: "Report not found" });
 
-    // check permission
     if (!hasAdminPermission(req.user, "canDeleteReports")) {
       return res.status(403).json({ message: "You don't have permission to delete reports" });
     }
 
     const bucket = getBucket();
 
-    // delete from GridFS
     await bucket.delete(report.gridfsFileId);
-
-    // delete metadata
     await Report.findByIdAndDelete(req.params.id);
 
     await AuditLog.create({
-      level:         "DANGER",
-      action:        `Deleted report: ${report.originalName}`,
-      performedBy:   req.user.name,
+      level: "DANGER",
+      action: `Deleted report: ${report.originalName}`,
+      performedBy: req.user.name,
       performedById: req.user._id,
     });
 
@@ -188,7 +198,7 @@ export const deleteReport = async (req, res) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GET /admin/users — view all public users
+// GET /admin/users
 // ─────────────────────────────────────────────────────────────────────────────
 export const getAllUsers = async (req, res) => {
   try {

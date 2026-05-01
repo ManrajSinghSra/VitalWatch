@@ -1,18 +1,30 @@
 import { getBucket } from "../db/gridfs.js";
 import { Report } from "../models/Report.js";
+import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
+import OpenAI from "openai";
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 const MAX_REPORTS = 20;
-const CHUNK_SIZE = 900;
-const CHUNK_OVERLAP = 180;
-const TOP_CHUNKS = 4;
+const TOP_CHUNKS = 5;
 const cache = new Map();
 
+// 🔥 disease vocabulary
+const DISEASE_WORDS = [
+  "dengue", "malaria", "measles", "chickenpox",
+  "diarrhoeal", "poisoning", "hepatitis",
+  "chikungunya", "fever"
+];
+
 const STOP_WORDS = new Set([
-  "a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "has",
-  "have", "how", "i", "in", "is", "it", "me", "near", "of", "on", "or",
-  "our", "the", "this", "to", "was", "what", "when", "where", "which",
-  "with", "you", "your",
+  "a","an","and","are","as","at","be","by","for","from","has","have","how",
+  "i","in","is","it","me","near","of","on","or","our","the","this","to",
+  "was","what","when","where","which","with","you","your"
 ]);
+
+/* ---------------- HELPERS ---------------- */
 
 const streamToBuffer = (stream) =>
   new Promise((resolve, reject) => {
@@ -24,148 +36,128 @@ const streamToBuffer = (stream) =>
 
 const normalizeText = (text) =>
   text
-    .replace(/\\r|\\n/g, " ")
     .replace(/\s+/g, " ")
-    .replace(/[^\x09\x0A\x0D\x20-\x7E]/g, " ")
+    .replace(/[^\x20-\x7E]/g, " ")
     .trim();
 
-const extractPdfText = (buffer) => {
-  const raw = buffer.toString("latin1");
-  const snippets = [];
-  const textOperatorPattern = /\(([^()]|\\.){4,}\)\s*Tj|\[((?:.|\n){8,}?)\]\s*TJ/g;
-  let match;
+/* ---------------- PDF PARSER ---------------- */
 
-  while ((match = textOperatorPattern.exec(raw)) !== null) {
-    snippets.push(
-      match[0]
-        .replace(/\\[nrtbf()\\]/g, " ")
-        .replace(/[()[\]]/g, " ")
-        .replace(/\s*T[Jj]$/g, " ")
-    );
+const extractPdfText = async (buffer) => {
+  const uint8Array = new Uint8Array(buffer);
+
+  const pdf = await pdfjsLib.getDocument({
+    data: uint8Array,
+  }).promise;
+
+  let text = "";
+
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+
+    const strings = content.items.map((item) => item.str);
+    text += strings.join(" ") + " ";
   }
 
-  const extracted = normalizeText(snippets.join(" "));
-  if (extracted.length > 200) return extracted;
-
-  return normalizeText(raw.replace(/[^A-Za-z0-9.,:;/%()\- ]/g, " "));
-};
-
-const extractDocxText = async (buffer) => {
-  const zlib = await import("zlib");
-  const textParts = [];
-  let offset = 0;
-
-  while (offset < buffer.length - 30) {
-    const signature = buffer.readUInt32LE(offset);
-    if (signature !== 0x04034b50) {
-      offset += 1;
-      continue;
-    }
-
-    const method = buffer.readUInt16LE(offset + 8);
-    const compressedSize = buffer.readUInt32LE(offset + 18);
-    const fileNameLength = buffer.readUInt16LE(offset + 26);
-    const extraLength = buffer.readUInt16LE(offset + 28);
-    const nameStart = offset + 30;
-    const dataStart = nameStart + fileNameLength + extraLength;
-    const name = buffer.toString("utf8", nameStart, nameStart + fileNameLength);
-    const dataEnd = dataStart + compressedSize;
-
-    if (name.endsWith(".xml") && dataEnd <= buffer.length) {
-      const compressed = buffer.subarray(dataStart, dataEnd);
-      let xml = "";
-
-      if (method === 0) xml = compressed.toString("utf8");
-      if (method === 8) xml = zlib.inflateRawSync(compressed).toString("utf8");
-
-      if (xml) {
-        textParts.push(
-          xml
-            .replace(/<w:tab\/>/g, " ")
-            .replace(/<\/w:p>/g, ". ")
-            .replace(/<[^>]+>/g, " ")
-        );
-      }
-    }
-
-    offset = dataEnd;
-  }
-
-  return normalizeText(textParts.join(" "));
+  return normalizeText(text);
 };
 
 const extractText = async (buffer, mimeType) => {
-  if (mimeType === "application/pdf") return extractPdfText(buffer);
-  if (mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
-    return extractDocxText(buffer);
+  if (mimeType === "application/pdf") {
+    return await extractPdfText(buffer);
   }
   return normalizeText(buffer.toString("utf8"));
 };
+
+/* ---------------- TOKENIZE ---------------- */
 
 const tokenize = (text) =>
   normalizeText(text)
     .toLowerCase()
     .split(/[^a-z0-9]+/)
-    .filter((token) => token.length > 2 && !STOP_WORDS.has(token));
+    .filter((t) => t.length > 2 && !STOP_WORDS.has(t));
+
+/* ---------------- CHUNKING ---------------- */
 
 const chunkText = (text) => {
+  const clean = normalizeText(text);
+
+  const parts = clean.match(/.{120,300}/g) || [];
   const chunks = [];
-  for (let start = 0; start < text.length; start += CHUNK_SIZE - CHUNK_OVERLAP) {
-    const chunk = text.slice(start, start + CHUNK_SIZE).trim();
-    if (chunk.length > 80) chunks.push(chunk);
+
+  for (const p of parts) {
+    const hasDisease = DISEASE_WORDS.some(d =>
+      p.toLowerCase().includes(d)
+    );
+
+    const hasNumber = /\d+/.test(p);
+
+    if (
+      (hasDisease || hasNumber) &&
+      !p.toLowerCase().includes("page") &&
+      !p.toLowerCase().includes("nic.in")
+    ) {
+      chunks.push(p.trim());
+    }
   }
+
+  if (chunks.length === 0) {
+    console.log("⚠️ chunk fallback used");
+    return parts.slice(0, 20);
+  }
+
   return chunks;
 };
 
+/* ---------------- SCORING ---------------- */
+
 const scoreChunk = (chunk, queryTokens) => {
-  const chunkTokens = tokenize(chunk);
-  const frequencies = new Map();
-  chunkTokens.forEach((token) => frequencies.set(token, (frequencies.get(token) || 0) + 1));
-  return queryTokens.reduce((score, token) => score + (frequencies.get(token) || 0), 0);
+  const tokens = tokenize(chunk);
+  const freq = new Map();
+
+  tokens.forEach(t => freq.set(t, (freq.get(t) || 0) + 1));
+
+  let score = queryTokens.reduce((s, t) => s + (freq.get(t) || 0), 0);
+
+  if (DISEASE_WORDS.some(d => chunk.toLowerCase().includes(d))) {
+    score += 5;
+  }
+
+  if (/\d+/.test(chunk)) {
+    score += 2;
+  }
+
+  return score;
 };
+
+/* ---------------- CACHE ---------------- */
 
 const getReportText = async (report) => {
-  const cacheKey = `${report._id}:${report.updatedAt?.getTime?.() || report.createdAt?.getTime?.()}`;
-  if (cache.has(cacheKey)) return cache.get(cacheKey);
+  const key = `${report._id}`;
+  if (cache.has(key)) return cache.get(key);
 
   const bucket = getBucket();
-  const buffer = await streamToBuffer(bucket.openDownloadStream(report.gridfsFileId));
-  const text = await extractText(buffer, report.mimeType);
-  const searchableText = normalizeText(
-    `${report.originalName}. Source: ${report.source}. ${report.description || ""}. ${text}`
+  const buffer = await streamToBuffer(
+    bucket.openDownloadStream(report.gridfsFileId)
   );
 
-  cache.set(cacheKey, searchableText);
-  return searchableText;
+  const text = await extractText(buffer, report.mimeType);
+
+  cache.set(key, text);
+  return text;
 };
 
-const pickSentences = (text, queryTokens) => {
-  const sentences = text
-    .split(/(?<=[.!?])\s+/)
-    .map((sentence) => sentence.trim())
-    .filter((sentence) => sentence.length > 40);
-
-  return sentences
-    .map((sentence) => ({ sentence, score: scoreChunk(sentence, queryTokens) }))
-    .filter((item) => item.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 5)
-    .map((item) => item.sentence);
-};
+/* ---------------- MAIN RAG ---------------- */
 
 export const askReportRag = async (question, userLocation) => {
-  const queryTokens = tokenize(`${question} ${userLocation || ""}`);
+  const queryTokens = [
+    ...tokenize(`${question} ${userLocation || ""}`),
+    ...DISEASE_WORDS
+  ];
+
   const reports = await Report.find()
     .sort({ createdAt: -1 })
-    .limit(MAX_REPORTS)
-    .select("-__v");
-
-  if (!reports.length) {
-    return {
-      answer: "No uploaded reports are available yet. Upload IDSP/WHO/NCDC reports first, then ask me about outbreaks, diseases, locations, or precautions from those reports.",
-      sources: [],
-    };
-  }
+    .limit(MAX_REPORTS);
 
   const allChunks = [];
 
@@ -173,51 +165,56 @@ export const askReportRag = async (question, userLocation) => {
     const text = await getReportText(report);
     const chunks = chunkText(text);
 
-    chunks.forEach((chunk, index) => {
-      const sourceBoost = scoreChunk(`${report.originalName} ${report.source} ${report.description}`, queryTokens);
+    console.log(`📄 ${report.originalName} → CHUNKS:`, chunks.length);
+
+    for (const chunk of chunks) {
       allChunks.push({
         chunk,
         report,
-        index,
-        score: scoreChunk(chunk, queryTokens) + sourceBoost,
+        score: scoreChunk(chunk, queryTokens)
       });
-    });
+    }
   }
 
+  console.log("📊 TOTAL CHUNKS:", allChunks.length);
+
   const ranked = allChunks
-    .filter((item) => item.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, TOP_CHUNKS);
 
+  console.log("🏆 TOP RESULTS COUNT:", ranked.length);
+
   if (!ranked.length) {
-    const latest = reports.slice(0, 3).map((report) => report.originalName).join(", ");
     return {
-      answer: `I checked the uploaded reports, but I could not find a clear match for your question. Try asking with a disease, state, district, source, or report name. Latest reports searched: ${latest}.`,
-      sources: reports.slice(0, 3).map((report) => ({
-        id: report._id,
-        name: report.originalName,
-        source: report.source,
-      })),
+      answer: "No relevant data found.",
+      sources: []
     };
   }
 
-  const evidence = ranked.flatMap((item) => pickSentences(item.chunk, queryTokens));
-  const fallbackEvidence = ranked.map((item) => `${item.chunk.slice(0, 420)}...`);
-  const uniqueEvidence = [...new Set(evidence.length ? evidence : fallbackEvidence)].slice(0, 5);
-  const sourceList = ranked.map(({ report, score }) => ({
-    id: report._id,
-    name: report.originalName,
-    source: report.source,
-    uploadedAt: report.createdAt,
-    score,
-  }));
+  /* ---------------- OPENAI ANSWER ---------------- */
+
+  const context = ranked.map(r => r.chunk).join("\n\n");
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [
+      {
+        role: "system",
+        content:
+          "You are a medical outbreak analyst. Extract diseases, locations, and case numbers clearly in bullet points."
+      },
+      {
+        role: "user",
+        content: `Context:\n${context}\n\nQuestion: ${question}`
+      }
+    ],
+  });
 
   return {
-    answer: [
-      "Based on the uploaded reports I found these relevant points:",
-      ...uniqueEvidence.map((sentence) => `- ${sentence}`),
-      "Use this as report-based guidance, not a medical diagnosis. For severe symptoms or emergencies, contact a healthcare professional.",
-    ].join("\n"),
-    sources: sourceList,
+    answer: completion.choices[0].message.content,
+    sources: ranked.map(r => ({
+      id: r.report._id,
+      name: r.report.originalName
+    }))
   };
 };
