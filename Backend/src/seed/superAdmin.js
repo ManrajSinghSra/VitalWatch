@@ -43,5 +43,5 @@ const createSuperAdmin = async () => {
     process.exit(0);
   }
 };
-
+// fu
 createSuperAdmin();
