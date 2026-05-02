@@ -81,11 +81,14 @@ export default function ChatWindow() {
         return;
       }
 
-      const sources = Array.isArray(data?.sources) && data.sources.length
-        ? `\n\n**Sources:** ${data.sources.map((source) => source.name).join(", ")}`
-        : "";
-
-      addMsg("bot", `${data?.reply || data?.answer || "Mr.Vital could not generate a response right now."}${sources}`);
+      // Attach sources array to the bot message so UI can render SourceChips
+      setMessages(prev => [...prev, {
+        id: Date.now() + Math.random(),
+        role: "bot",
+        content: data?.reply || data?.answer || "Mr.Vital could not generate a response right now.",
+        timestamp: fmt(),
+        sources: data.sources || [],
+      }]);
     } catch {
       setTyping(false);
       addMsg("bot", "Mr.Vital could not connect to the report knowledge base right now.");

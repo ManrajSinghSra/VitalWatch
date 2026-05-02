@@ -55,11 +55,15 @@ const MEDICAL_MARKERS = [
 
 export default function UserDashboard() {
   const { user, logout } = useAuth();
-  console.log("user",user);
-  
+  console.log("user", user);
+
   const navigate = useNavigate();
   const [tab, setTab] = useState("chat");
   const [reports, setReports] = useState([]);
+
+  // 🔥 NEW: dynamic risk state
+  const [riskInfo, setRiskInfo] = useState(null);
+  const [riskLoading, setRiskLoading] = useState(true);
 
   useEffect(() => {
     const t1 = setTimeout(() => {
@@ -100,6 +104,53 @@ export default function UserDashboard() {
 
     loadReports();
   }, []);
+
+  // 🔥 NEW: fetch user-region risk based on user.location
+  useEffect(() => {
+    const extractState = (loc) => {
+      if (!loc) return null;
+      const parts = loc.split(",").map((s) => s.trim()).filter(Boolean);
+      if (parts.length === 0) return null;
+      if (parts.length === 1) return parts[0];
+      const last = parts[parts.length - 1].toLowerCase();
+      if (last === "india" || last === "in") {
+        return parts[parts.length - 2] || parts[0];
+      }
+      return parts[parts.length - 1];
+    };
+
+    const state = extractState(user?.location);
+
+    if (!state) {
+      setRiskInfo({ risk: null, label: "location not set" });
+      setRiskLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setRiskLoading(true);
+
+    fetch(`${API_URL}/dashboard/user-risk?state=${encodeURIComponent(state)}`, {
+      credentials: "include",
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!cancelled) {
+          setRiskInfo(data);
+          setRiskLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setRiskInfo(null);
+          setRiskLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.location]);
 
   const firstName = user?.name?.split(" ")[0] || "User";
   const heroStats = [
@@ -276,9 +327,54 @@ export default function UserDashboard() {
               Spreading <span className="text-cyan-600">Near You</span>
             </h1>
 
+            {/* 🔥 DYNAMIC RISK MESSAGE */}
             <p className="mt-3 max-w-lg text-sm text-slate-600">
-              Hey <span className="font-medium">{firstName}</span>, your region shows{" "}
-              <span className="font-medium text-yellow-600">moderate risk</span>.
+              {riskLoading ? (
+                <span className="text-slate-400">Checking your region…</span>
+              ) : !riskInfo || riskInfo.risk === null ? (
+                <>
+                  Hey <span className="font-medium">{firstName}</span>, set your
+                  location in your profile to see disease risk for your region.
+                </>
+              ) : riskInfo.risk === "none" ? (
+                <>
+                  Hey <span className="font-medium">{firstName}</span>, no
+                  outbreaks reported in{" "}
+                  <span className="font-medium">{riskInfo.state}</span> in the
+                  latest data.
+                </>
+              ) : (
+                <>
+                  Hey <span className="font-medium">{firstName}</span>, your
+                  region (<span className="font-medium">{riskInfo.state}</span>)
+                  shows{" "}
+                  <span
+                    className={
+                      riskInfo.risk === "high"
+                        ? "font-semibold text-red-600"
+                        : riskInfo.risk === "moderate"
+                        ? "font-semibold text-amber-600"
+                        : "font-semibold text-emerald-600"
+                    }
+                  >
+                    {riskInfo.label}
+                  </span>
+                  {" — "}
+                  {riskInfo.cases} case{riskInfo.cases !== 1 ? "s" : ""} across{" "}
+                  {riskInfo.outbreaks} outbreak
+                  {riskInfo.outbreaks !== 1 ? "s" : ""}
+                  {riskInfo.deaths > 0 && (
+                    <>
+                      {", "}
+                      <span className="font-semibold text-red-600">
+                        {riskInfo.deaths} death
+                        {riskInfo.deaths !== 1 ? "s" : ""}
+                      </span>
+                    </>
+                  )}
+                  .
+                </>
+              )}
             </p>
           </div>
 

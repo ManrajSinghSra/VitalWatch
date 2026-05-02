@@ -1,3 +1,66 @@
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:6001";
+
+// Inject cursor animation styles
+const cursorStyle = `
+@keyframes vw-blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
+.vw-cursor { display: inline-block; width: 7px; height: 14px; background: currentColor; margin-left: 2px; vertical-align: text-bottom; animation: vw-blink 1s step-end infinite; }
+`;
+
+// Inject once
+if (typeof document !== "undefined" && !document.getElementById("vw-stream-cursor")) {
+  const s = document.createElement("style");
+  s.id = "vw-stream-cursor";
+  s.textContent = cursorStyle;
+  document.head.appendChild(s);
+}
+
+export function SourceChips({ sources = [] }) {
+  if (!sources || sources.length === 0) return null;
+
+  // Dedupe by reportId so we don't show the same PDF multiple times.
+  // Aggregation-mode sources don't have reportId — skip them.
+  const uniqueSources = [];
+  const seen = new Set();
+  for (const s of sources) {
+    if (!s.reportId) continue;
+    if (seen.has(s.reportId)) continue;
+    seen.add(s.reportId);
+    uniqueSources.push(s);
+  }
+
+  if (uniqueSources.length === 0) return null;
+
+  const handleOpen = (reportId) => {
+    window.open(`${API_BASE}/report/download/${reportId}`, "_blank");
+  };
+
+  return (
+    <div className="mt-2.5 flex flex-col gap-1.5">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+        Sources ({uniqueSources.length})
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        {uniqueSources.map((s, i) => (
+          <button
+            key={`${s.reportId}-${i}`}
+            onClick={() => handleOpen(s.reportId)}
+            className="group flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] text-slate-600 transition hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-700"
+            title={`Open report — week ${s.week}/${s.year}`}
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-cyan-500" />
+            <span className="font-medium">{s.disease || "Outbreak"}</span>
+            {s.location && <span className="text-slate-500">· {s.location}</span>}
+            {s.week && <span className="text-slate-400">· Wk {s.week}</span>}
+            <svg className="h-3 w-3 text-slate-400 transition group-hover:text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function Bold({ text }) {
   return (
     <>
@@ -43,7 +106,8 @@ function RiskCard({ card }) {
   );
 }
 
-export function MessageBubble({ role, content, card, timestamp }) {
+export function MessageBubble(message) {
+  const { role, content, card, timestamp, isStreaming } = message;
   const isBot = role === "bot";
 
   return (
@@ -70,14 +134,18 @@ export function MessageBubble({ role, content, card, timestamp }) {
               : "rounded-tr-sm bg-cyan-500 text-white"
           }`}
         >
-          {content.split("\n").map((line, index, arr) => (
-            <span key={index}>
-              <Bold text={line} />
-              {index < arr.length - 1 && <br />}
-            </span>
-          ))}
+          <div className="whitespace-pre-wrap">
+            {content.split("\n").map((line, index, arr) => (
+              <span key={index}>
+                <Bold text={line} />
+                {index < arr.length - 1 && <br />}
+              </span>
+            ))}
+            {isStreaming && <span className="vw-cursor" />}
+          </div>
 
           {card && <RiskCard card={card} />}
+          {isBot && message.sources && <SourceChips sources={message.sources} />}
         </div>
 
         <p className={`mt-1 text-xs text-slate-500 ${isBot ? "text-left" : "text-right"}`}>

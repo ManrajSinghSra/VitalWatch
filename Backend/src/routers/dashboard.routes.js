@@ -83,3 +83,77 @@ dashboardRoutes.get("/state-detail/:state", async (req, res) => {
     return res.status(500).json({ message: "Failed to fetch state details" });
   }
 });
+dashboardRoutes.get("/user-risk", async (req, res) => {
+  try {
+    const { state } = req.query;
+    
+    if (!state || !state.trim()) {
+      return res.json({ 
+        risk: null, 
+        label: "no location set", 
+        state: null 
+      });
+    }
+
+    const data = await ReportChunk.aggregate([
+      { 
+        $match: { 
+          "metadata.state": new RegExp(state.trim(), "i") 
+        } 
+      },
+      {
+        $group: {
+          _id: null,
+          totalCases: { $sum: "$metadata.cases" },
+          totalDeaths: { $sum: "$metadata.deaths" },
+          outbreaks: { $sum: 1 },
+          diseases: { $addToSet: "$metadata.disease" },
+          districts: { $addToSet: "$metadata.district" },
+        }
+      }
+    ]);
+
+    if (data.length === 0) {
+      return res.json({
+        risk: "none",
+        label: "no recent outbreaks",
+        state,
+        cases: 0,
+        deaths: 0,
+        outbreaks: 0,
+        diseases: [],
+      });
+    }
+
+    const { totalCases, totalDeaths, outbreaks, diseases } = data[0];
+
+    // Risk scoring rules
+    let risk, label;
+    if (totalDeaths > 0 || totalCases > 300) {
+      risk = "high";
+      label = "high risk";
+    } else if (totalCases > 100 || outbreaks > 5) {
+      risk = "moderate";
+      label = "moderate risk";
+    } else if (outbreaks > 0) {
+      risk = "low";
+      label = "low risk";
+    } else {
+      risk = "none";
+      label = "no recent outbreaks";
+    }
+
+    return res.json({
+      risk,
+      label,
+      state,
+      cases: totalCases,
+      deaths: totalDeaths,
+      outbreaks,
+      diseases: (diseases || []).filter(Boolean).slice(0, 3),
+    });
+  } catch (err) {
+    console.error("user-risk error:", err);
+    return res.status(500).json({ message: "Failed to compute user risk" });
+  }
+});

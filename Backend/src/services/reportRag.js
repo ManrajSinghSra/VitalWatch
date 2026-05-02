@@ -370,3 +370,155 @@ export const askReportRag = async (question) => {
     relaxed,
   };
 };
+
+/* ─────────── Streaming variants ─────────── */
+
+/**
+ * Performs all retrieval + filter relaxation + context building.
+ * Returns { messages, sources, intent, mode, prefix } where:
+ *   - messages: array ready to pass to OpenAI
+ *   - sources: array for the SourceChips UI
+ *   - prefix: text to send before streaming starts (e.g. "no data" message)
+ *             If prefix is set, do NOT call streamAnswer — just send prefix as the answer.
+ */
+export const retrieveContext = async (question) => {
+  const totalChunks = await ReportChunk.countDocuments();
+  if (totalChunks === 0) {
+    return {
+      messages: null,
+      sources: [],
+      intent: null,
+      mode: "no_data",
+      prefix: "No outbreak reports have been uploaded yet. Please upload an IDSP report first.",
+    };
+  }
+
+  const intent = await classifyIntent(question);
+  console.log("🎯 Intent:", intent);
+
+  const describeFilters = () => {
+    const parts = [];
+    if (intent.disease) parts.push(`disease: ${intent.disease}`);
+    if (intent.state) parts.push(`state: ${intent.state}`);
+    if (intent.district) parts.push(`district: ${intent.district}`);
+    if (intent.timeFrame === "specific_week" && intent.weekNumber) {
+      parts.push(intent.year ? `week ${intent.weekNumber} of ${intent.year}` : `week ${intent.weekNumber}`);
+    } else if (intent.timeFrame === "latest") {
+      parts.push("the latest week");
+    }
+    return parts.length ? parts.join(", ") : null;
+  };
+
+  // Aggregation path
+  if (intent.intent === "aggregation") {
+    const { results: stats, relaxed } = await handleAggregation(intent);
+
+    if (stats.length === 0) {
+      const filterDesc = describeFilters();
+      return {
+        messages: null,
+        sources: [],
+        intent,
+        mode: "aggregation",
+        prefix: filterDesc
+          ? `No outbreak data found for ${filterDesc}. Try broadening your question.`
+          : "No outbreak data found matching your question.",
+      };
+    }
+
+    const summary = stats
+      .map(s => {
+        const weeks = s.weeks.filter(Boolean).sort((a, b) => a - b).join(", ");
+        const districts = s.districts.filter(Boolean).join(", ") || "unknown";
+        return `${s._id.disease || "Unknown disease"} in ${s._id.state || "Unknown state"}: ${s.totalCases} cases, ${s.totalDeaths} deaths across ${s.outbreaks} outbreak(s) | districts: [${districts}] | weeks: [${weeks}]`;
+      })
+      .join("\n");
+
+    const timeContext = relaxed === "time"
+      ? "Note: no data matched the exact time frame requested, so this answer covers all uploaded weeks."
+      : intent.timeFrame === "latest" ? "Time scope: latest week available."
+      : intent.timeFrame === "all" ? "Time scope: all uploaded reports combined."
+      : `Time scope: week ${intent.weekNumber}${intent.year ? ` of ${intent.year}` : ""}.`;
+
+    return {
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: `${timeContext}\n\nAggregated statistics from IDSP reports:\n${summary}\n\nQuestion: ${question}` },
+      ],
+      sources: stats.slice(0, 5),
+      intent,
+      mode: "aggregation",
+      prefix: null,
+    };
+  }
+
+  // Semantic / lookup path
+  const { results: topChunks, relaxed } = await vectorSearch(question, intent);
+
+  if (topChunks.length === 0) {
+    const filterDesc = describeFilters();
+    return {
+      messages: null,
+      sources: [],
+      intent,
+      mode: "semantic",
+      prefix: filterDesc
+        ? `No outbreak data found for ${filterDesc} in the uploaded reports. This could mean no outbreaks were reported there, or the relevant report hasn't been uploaded yet.`
+        : "I couldn't find anything relevant to your question in the uploaded outbreak reports. Try asking about a particular disease, state, or district.",
+    };
+  }
+
+  const relaxationNote = relaxed === "time" ? "(Note: no data in the requested time frame, showing matches from all weeks.)\n\n"
+    : relaxed === "district+time" ? "(Note: no data for that exact district/time, showing related state-level data.)\n\n"
+    : relaxed === "all_filters" ? "(Note: no exact filter match, showing closest semantic results.)\n\n"
+    : "";
+
+  const context = topChunks
+    .map((c, i) =>
+      `[Source ${i + 1}] State: ${c.metadata.state || "N/A"} | District: ${c.metadata.district || "N/A"} | Disease: ${c.metadata.disease || "N/A"} | Cases: ${c.metadata.cases} | Deaths: ${c.metadata.deaths} | Status: ${c.metadata.status || "N/A"} | Start: ${c.metadata.startDate || "N/A"} | Week: ${c.metadata.weekNumber || "N/A"}/${c.metadata.year || "N/A"}\n${c.text}`
+    )
+    .join("\n\n---\n\n");
+
+  return {
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: `${relaxationNote}Context from IDSP reports:\n\n${context}\n\nQuestion: ${question}` },
+    ],
+    sources: topChunks.map(c => ({
+      reportId: c.reportId,
+      disease: c.metadata.disease,
+      location: `${c.metadata.district || ""}, ${c.metadata.state || ""}`.trim(),
+      week: c.metadata.weekNumber,
+      year: c.metadata.year,
+      cases: c.metadata.cases,
+      deaths: c.metadata.deaths,
+      similarity: c.similarity.toFixed(3),
+    })),
+    intent,
+    mode: "semantic",
+    prefix: null,
+  };
+};
+
+/**
+ * Streams an OpenAI response. Calls onToken for each chunk of text.
+ * Returns the full assembled answer when complete.
+ */
+export const streamAnswer = async (messages, onToken) => {
+  const stream = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages,
+    temperature: 0.2,
+    stream: true,
+  });
+
+  let fullText = "";
+  for await (const chunk of stream) {
+    const delta = chunk.choices?.[0]?.delta?.content || "";
+    if (delta) {
+      fullText += delta;
+      onToken(delta);
+    }
+  }
+  return fullText;
+};
