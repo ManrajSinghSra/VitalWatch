@@ -157,3 +157,112 @@ dashboardRoutes.get("/user-risk", async (req, res) => {
     return res.status(500).json({ message: "Failed to compute user risk" });
   }
 });
+
+dashboardRoutes.get("/disease-summary", async (req, res) => {
+  try {
+    const data = await ReportChunk.aggregate([
+      { $match: { "metadata.disease": { $ne: null } } },
+      {
+        $group: {
+          _id: "$metadata.disease",
+          totalCases: { $sum: "$metadata.cases" },
+          totalDeaths: { $sum: "$metadata.deaths" },
+          outbreaks: { $sum: 1 },
+          states: { $addToSet: "$metadata.state" },
+        },
+      },
+      { $sort: { totalCases: -1 } },
+      { $limit: 15 },
+    ]);
+
+    return res.json({ diseases: data });
+  } catch (err) {
+    console.error("disease-summary error:", err);
+    return res.status(500).json({ message: "Failed to fetch disease summary" });
+  }
+});
+
+// GET /dashboard/alerts
+// Returns prioritized outbreak alerts: deaths first, then large outbreaks, then most recent
+dashboardRoutes.get("/alerts", async (req, res) => {
+  try {
+    // Get latest week to know what counts as "recent"
+    const latestChunk = await ReportChunk.findOne({
+      "metadata.weekNumber": { $ne: null },
+    })
+      .sort({ "metadata.year": -1, "metadata.weekNumber": -1 })
+      .select("metadata.year metadata.weekNumber")
+      .lean();
+
+    const latestWeek = latestChunk?.metadata?.weekNumber;
+    const latestYear = latestChunk?.metadata?.year;
+
+    // Pull all outbreaks, score them, return top N
+    const outbreaks = await ReportChunk.find(
+      { "metadata.disease": { $ne: null } },
+      { embedding: 0, text: 0 }
+    )
+      .lean();
+
+    const alerts = outbreaks
+      .map((o) => {
+        const m = o.metadata || {};
+        let priority = 0;
+        let urgency = "info";
+        let reason = "";
+
+        // Priority scoring
+        if (m.deaths > 0) {
+          priority += 1000 + m.deaths * 10;
+          urgency = "danger";
+          reason = `${m.deaths} death${m.deaths !== 1 ? "s" : ""} reported`;
+        } else if (m.cases >= 100) {
+          priority += 500 + m.cases;
+          urgency = "warning";
+          reason = `Large outbreak — ${m.cases} cases`;
+        } else if (m.cases >= 25) {
+          priority += 100 + m.cases;
+          urgency = "info";
+          reason = `${m.cases} cases reported`;
+        } else {
+          priority += m.cases || 0;
+          urgency = "info";
+          reason = `${m.cases || 0} cases`;
+        }
+
+        // Boost recent week
+        if (m.weekNumber === latestWeek && m.year === latestYear) {
+          priority += 50;
+        }
+
+        // Status-based urgency override
+        if (m.status === "Under Control") {
+          urgency = urgency === "danger" ? "danger" : "success";
+        }
+
+        return {
+          id: o._id,
+          urgency,
+          reason,
+          disease: m.disease,
+          state: m.state,
+          district: m.district,
+          cases: m.cases || 0,
+          deaths: m.deaths || 0,
+          week: m.weekNumber,
+          year: m.year,
+          status: m.status,
+          startDate: m.startDate,
+          isLatest: m.weekNumber === latestWeek && m.year === latestYear,
+          priority,
+        };
+      })
+      .sort((a, b) => b.priority - a.priority)
+      .slice(0, 20);
+
+    return res.json({ alerts, latestWeek, latestYear });
+  } catch (err) {
+    console.error("alerts error:", err);
+    return res.status(500).json({ message: "Failed to fetch alerts" });
+  }
+});

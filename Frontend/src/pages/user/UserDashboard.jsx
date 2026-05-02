@@ -5,6 +5,7 @@ import ChatWindow from "../../components/chat/ChatWindow";
 import { DataSourcesPanel, DiseaseSidebar, OutbreakMap, WeeklyTrend } from "../../components/dashboard/DashWidgets";
 import { toast } from "../../components/ui/Toast";
 import { Badge, CardBox, CardHeader } from "../../components/ui";
+import AlertsPanel from "../../components/AlertsPanel";
 
 const API_URL = "http://localhost:6001";
 
@@ -404,7 +405,7 @@ export default function UserDashboard() {
       </div>
 
       <div className="relative z-10 mx-auto grid w-full max-w-[1280px] flex-1 gap-4 px-8 pb-12 xl:grid-cols-[240px_minmax(0,1fr)_300px] xl:grid-rows-[auto_auto]">
-        <DiseaseSidebar reports={reports} location={user?.location} />
+        <DiseaseSidebar location={user?.location} />
         <div className="w-full xl:col-span-2">
           {tab === "chat" && <ChatWindow />}
 
@@ -429,24 +430,7 @@ export default function UserDashboard() {
             </CardBox>
           )}
 
-          {tab === "alerts" && (
-            <CardBox>
-              <CardHeader title="Current Alerts" />
-              {reports.filter((report) => report.status === "processed").map((report) => (
-                <div key={report._id} className="flex items-center gap-4 border-b border-slate-200 px-4 py-4 last:border-0">
-                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-slate-800">{report.originalName}</p>
-                    <p className="text-xs text-slate-500">{report.source}</p>
-                  </div>
-                  <Badge>{report.status}</Badge>
-                </div>
-              ))}
-              {!reports.filter((report) => report.status === "processed").length && (
-                <div className="p-5 text-sm text-slate-500">No processed report alerts yet.</div>
-              )}
-            </CardBox>
-          )}
+          {tab === "alerts" && <AlertsPanel/>}
 
           {tab === "map" && <OutbreakMap reports={reports} />}
         </div>

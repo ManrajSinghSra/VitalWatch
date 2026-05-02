@@ -10,6 +10,7 @@ const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:6001";
 const INDIA_GEOJSON_URL = "https://raw.githubusercontent.com/geohacker/india/master/state/india_telengana.geojson";
 
 const colors = ["bg-red-500", "bg-yellow-500", "bg-emerald-500", "bg-cyan-500", "bg-purple-500"];
+const DISEASE_DOT_COLORS = ["bg-red-500", "bg-yellow-500", "bg-emerald-500", "bg-cyan-500", "bg-purple-500", "bg-pink-500", "bg-amber-500", "bg-teal-500", "bg-blue-500", "bg-rose-500"];
 
 function getReportText(report) {
   return `${report.originalName || ""} ${report.source || ""} ${report.description || ""}`.toLowerCase();
@@ -42,10 +43,36 @@ export function buildSourceSummary(reports = []) {
   return [...counts.entries()].map(([name, count]) => ({ id: name, name, count, status: "synced" }));
 }
 
-export function DiseaseSidebar({ reports = [], location = "" }) {
-  const diseases = useMemo(() => buildDiseaseSummary(reports), [reports]);
+export function DiseaseSidebar({ location = "" }) {
+  const [diseases, setDiseases] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [active, setActive] = useState("");
-  const selected = active || diseases[0]?.id;
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/dashboard/disease-summary`, {
+          credentials: "include",
+        });
+        if (!res.ok) throw new Error("Failed to load");
+        const data = await res.json();
+        if (!cancelled) {
+          setDiseases(data.diseases || []);
+          setLoading(false);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error("disease-summary fetch failed:", err);
+          setDiseases([]);
+          setLoading(false);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const selected = active || diseases[0]?._id;
 
   return (
     <div className="flex flex-col gap-4">
@@ -57,33 +84,50 @@ export function DiseaseSidebar({ reports = [], location = "" }) {
             <p className="text-sm font-semibold text-slate-700">{location || "Not set"}</p>
           </div>
           <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
-            <p className="mb-1.5 text-xs text-slate-500">Report Signals</p>
-            <span className="text-xs font-bold text-cyan-600">{reports.length} uploaded reports</span>
+            <p className="mb-1.5 text-xs text-slate-500">Diseases Tracked</p>
+            <span className="text-xs font-bold text-cyan-600">
+              {loading ? "loading…" : `${diseases.length} unique diseases`}
+            </span>
           </div>
         </div>
       </CardBox>
 
       <CardBox>
         <CardHeader title="Disease Monitor" />
-        <div className="flex flex-col gap-0.5 p-1.5">
-          {diseases.map((disease) => (
+        <div className="flex flex-col gap-0.5 p-1.5 max-h-[400px] overflow-y-auto">
+          {loading && (
+            <p className="p-3 text-xs text-slate-500">Loading diseases…</p>
+          )}
+
+          {!loading && diseases.length === 0 && (
+            <p className="p-3 text-xs text-slate-500">
+              No outbreak data yet. Upload a report to see diseases.
+            </p>
+          )}
+
+          {!loading && diseases.map((disease, i) => (
             <button
-              key={disease.id}
-              onClick={() => setActive(disease.id)}
+              key={disease._id}
+              onClick={() => setActive(disease._id)}
               className={`flex w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition ${
-                selected === disease.id
+                selected === disease._id
                   ? "border-cyan-200 bg-cyan-50 text-cyan-700"
                   : "border-transparent text-slate-600 hover:bg-slate-50"
               }`}
+              title={`${disease.totalCases} cases across ${disease.outbreaks} outbreak${disease.outbreaks !== 1 ? "s" : ""}${disease.totalDeaths > 0 ? `, ${disease.totalDeaths} death${disease.totalDeaths !== 1 ? "s" : ""}` : ""}`}
             >
-              <span className={`h-2 w-2 rounded-full ${disease.dot}`} />
-              <span className="flex-1 text-xs font-medium">{disease.name}</span>
+              <span className={`h-2 w-2 rounded-full ${DISEASE_DOT_COLORS[i % DISEASE_DOT_COLORS.length]}`} />
+              <span className="flex-1 text-xs font-medium truncate">{disease._id}</span>
               <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-bold text-slate-600">
-                {disease.cases}
+                {disease.totalCases}
               </span>
+              {disease.totalDeaths > 0 && (
+                <span className="rounded bg-red-100 px-1 py-0.5 text-[10px] font-bold text-red-700">
+                  {disease.totalDeaths}†
+                </span>
+              )}
             </button>
           ))}
-          {!diseases.length && <p className="p-3 text-xs text-slate-500">No disease keywords found in uploaded reports yet.</p>}
         </div>
       </CardBox>
     </div>
