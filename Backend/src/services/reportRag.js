@@ -12,10 +12,8 @@ const openai = new OpenAI({
 const TOP_K = 8;
 const MIN_SIMILARITY = 0.20;
 
-/**
- * Use LLM to classify the user's intent and pull out filters.
- * Replaces brittle keyword matching.
- */
+/* ─────────── Intent classification ─────────── */
+
 const classifyIntent = async (question) => {
   const completion = await openai.chat.completions.create({
     model: "gpt-4o-mini",
@@ -30,149 +28,327 @@ Schema:
   "state": string | null,
   "district": string | null,
   "disease": string | null,
-  "wantsDeaths": boolean
+  "wantsDeaths": boolean,
+  "timeFrame": "latest" | "all" | "specific_week",
+  "weekNumber": number | null,
+  "year": number | null
 }
 
+Intent:
 - "aggregation": user asks for counts/totals/sums ("how many measles cases", "total deaths", "which states have outbreaks")
-- "lookup": user asks about a specific location or disease ("what's happening in Kerala", "tell me about the Shigellosis outbreak")
+- "lookup": user asks about a specific location, disease, or week ("what's happening in Kerala", "show me week 10", "tell me about the Shigellosis outbreak")
 - "general": anything else (symptoms, prevention, advice)
 
-Extract state/district/disease only if explicitly mentioned. Use proper Indian state names (e.g. "Tamil Nadu" not "TN").`
+Time frame:
+- "latest": ONLY when user uses present-tense temporal words: "this week", "currently", "right now", "now", "latest", "current"
+- "specific_week": user mentions ANY specific week number ("week 9", "week 10")
+- "all" (DEFAULT): everything else — generic questions about the data, lookups, or anything without a clear time hint
+
+CRITICAL RULES FOR YEAR:
+- ONLY set year if the user EXPLICITLY mentions a 4-digit year like "2024", "2025", "2026"
+- If the user says "week 9" or "week 10" without a year, year MUST be null
+- NEVER infer or guess the year. NEVER default to the current year. NEVER use your training data to fill it in.
+- If unsure about year, year is null.
+
+Use proper Indian state names (e.g. "Tamil Nadu" not "TN"). Use proper disease names (e.g. "Measles" not "measles").`,
       },
-      { role: "user", content: question }
+      { role: "user", content: question },
     ],
     temperature: 0,
     response_format: { type: "json_object" },
   });
 
   try {
-    return JSON.parse(completion.choices[0].message.content);
+    const parsed = JSON.parse(completion.choices[0].message.content);
+    return {
+      intent: parsed.intent || "general",
+      state: parsed.state || null,
+      district: parsed.district || null,
+      disease: parsed.disease || null,
+      wantsDeaths: !!parsed.wantsDeaths,
+      timeFrame: parsed.timeFrame || "all",
+      weekNumber: parsed.weekNumber || null,
+      year: parsed.year || null,
+    };
   } catch {
-    return { intent: "general", state: null, district: null, disease: null, wantsDeaths: false };
+    return {
+      intent: "general",
+      state: null,
+      district: null,
+      disease: null,
+      wantsDeaths: false,
+      timeFrame: "all",
+      weekNumber: null,
+      year: null,
+    };
   }
 };
 
-/**
- * Aggregation path: structured Mongo query, no vector search needed.
- */
-const handleAggregation = async (filters) => {
-  const match = {};
-  if (filters.state) match["metadata.state"] = new RegExp(filters.state, "i");
-  if (filters.disease) match["metadata.disease"] = new RegExp(filters.disease, "i");
-  if (filters.district) match["metadata.district"] = new RegExp(filters.district, "i");
+/* ─────────── Temporal filter helpers ─────────── */
 
-  return ReportChunk.aggregate([
-    { $match: match },
-    {
-      $group: {
-        _id: {
-          disease: "$metadata.disease",
-          state: "$metadata.state",
-        },
-        totalCases: { $sum: "$metadata.cases" },
-        totalDeaths: { $sum: "$metadata.deaths" },
-        outbreaks: { $sum: 1 },
-        districts: { $addToSet: "$metadata.district" },
-      },
-    },
-    { $sort: { totalCases: -1 } },
-    { $limit: 30 },
-  ]);
-};
-
-/**
- * Vector search with metadata pre-filtering when possible.
- */
-const vectorSearch = async (question, filters) => {
-  const queryEmbedding = await getEmbedding(question);
-
-  const mongoFilter = {};
-  if (filters.state) mongoFilter["metadata.state"] = new RegExp(filters.state, "i");
-  if (filters.disease) mongoFilter["metadata.disease"] = new RegExp(filters.disease, "i");
-  if (filters.district) mongoFilter["metadata.district"] = new RegExp(filters.district, "i");
-
-  let pool = await ReportChunk.find(mongoFilter)
-    .select("text embedding metadata reportId")
+const getLatestWeek = async () => {
+  const latest = await ReportChunk.findOne({
+    "metadata.weekNumber": { $ne: null },
+    "metadata.year": { $ne: null },
+  })
+    .sort({ "metadata.year": -1, "metadata.weekNumber": -1 })
+    .select("metadata.year metadata.weekNumber")
     .lean();
 
-  // fall back to all chunks if filter returned nothing
-  if (pool.length === 0) {
-    pool = await ReportChunk.find().select("text embedding metadata reportId").lean();
-  }
-
-  return pool
-    .map(c => ({ ...c, similarity: cosineSimilarity(queryEmbedding, c.embedding) }))
-    .filter(c => c.similarity >= MIN_SIMILARITY)
-    .sort((a, b) => b.similarity - a.similarity)
-    .slice(0, TOP_K);
+  return latest
+    ? { year: latest.metadata.year, weekNumber: latest.metadata.weekNumber }
+    : null;
 };
 
-/**
- * Build the LLM prompt for natural-sounding answers.
- */
+const buildTemporalFilter = async (intent) => {
+  const filter = {};
+
+  if (intent.timeFrame === "latest") {
+    const latest = await getLatestWeek();
+    if (latest) {
+      filter["metadata.year"] = latest.year;
+      filter["metadata.weekNumber"] = latest.weekNumber;
+    }
+  } else if (intent.timeFrame === "specific_week" && intent.weekNumber) {
+    filter["metadata.weekNumber"] = intent.weekNumber;
+    if (intent.year) {
+      filter["metadata.year"] = intent.year;
+    }
+  }
+
+  return filter;
+};
+
+/* ─────────── Aggregation path with filter relaxation ─────────── */
+
+const handleAggregation = async (intent) => {
+  const buildMatch = async (opts = {}) => {
+    const match = opts.skipTemporal ? {} : await buildTemporalFilter(intent);
+    if (intent.state && !opts.skipState) match["metadata.state"] = new RegExp(intent.state, "i");
+    if (intent.disease && !opts.skipDisease) match["metadata.disease"] = new RegExp(intent.disease, "i");
+    if (intent.district && !opts.skipDistrict) match["metadata.district"] = new RegExp(intent.district, "i");
+    return match;
+  };
+
+  const runAggregation = async (match) => {
+    return ReportChunk.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: { disease: "$metadata.disease", state: "$metadata.state" },
+          totalCases: { $sum: "$metadata.cases" },
+          totalDeaths: { $sum: "$metadata.deaths" },
+          outbreaks: { $sum: 1 },
+          districts: { $addToSet: "$metadata.district" },
+          weeks: { $addToSet: "$metadata.weekNumber" },
+        },
+      },
+      { $sort: { totalCases: -1 } },
+      { $limit: 30 },
+    ]);
+  };
+
+  let results = await runAggregation(await buildMatch());
+  if (results.length > 0) return { results, relaxed: null };
+
+  if (intent.timeFrame === "latest" || intent.timeFrame === "specific_week") {
+    results = await runAggregation(await buildMatch({ skipTemporal: true }));
+    if (results.length > 0) return { results, relaxed: "time" };
+  }
+
+  if (intent.district) {
+    results = await runAggregation(await buildMatch({ skipDistrict: true, skipTemporal: true }));
+    if (results.length > 0) return { results, relaxed: "district+time" };
+  }
+
+  return { results: [], relaxed: null };
+};
+
+/* ─────────── Vector retrieval with filter relaxation ─────────── */
+
+const vectorSearch = async (question, intent) => {
+  const queryEmbedding = await getEmbedding(question);
+
+  const buildFilter = async (opts = {}) => {
+    const filter = opts.skipTemporal ? {} : await buildTemporalFilter(intent);
+    if (intent.state && !opts.skipState) filter["metadata.state"] = new RegExp(intent.state, "i");
+    if (intent.disease && !opts.skipDisease) filter["metadata.disease"] = new RegExp(intent.disease, "i");
+    if (intent.district && !opts.skipDistrict) filter["metadata.district"] = new RegExp(intent.district, "i");
+    return filter;
+  };
+
+  const searchPool = async (filter) => {
+    const pool = await ReportChunk.find(filter)
+      .select("text embedding metadata reportId")
+      .lean();
+    if (pool.length === 0) return [];
+    return pool
+      .map(c => ({ ...c, similarity: cosineSimilarity(queryEmbedding, c.embedding) }))
+      .filter(c => c.similarity >= MIN_SIMILARITY)
+      .sort((a, b) => b.similarity - a.similarity)
+      .slice(0, TOP_K);
+  };
+
+  let results = await searchPool(await buildFilter());
+  if (results.length > 0) return { results, relaxed: null };
+
+  if (intent.timeFrame === "latest" || intent.timeFrame === "specific_week") {
+    results = await searchPool(await buildFilter({ skipTemporal: true }));
+    if (results.length > 0) return { results, relaxed: "time" };
+  }
+
+  if (intent.district) {
+    results = await searchPool(await buildFilter({ skipDistrict: true, skipTemporal: true }));
+    if (results.length > 0) return { results, relaxed: "district+time" };
+  }
+
+  results = await searchPool({});
+  return { results, relaxed: results.length > 0 ? "all_filters" : null };
+};
+
+/* ─────────── Prompt ─────────── */
+
 const SYSTEM_PROMPT = `You are a public health assistant analyzing Indian IDSP weekly outbreak reports.
 
 ANSWER RULES:
-1. Answer the user's question directly using ONLY the provided context.
+1. Answer the user's question directly using ONLY the provided context. If the context doesn't contain the answer, say so explicitly — do NOT invent data.
 2. Use natural prose. Use bullet points ONLY when listing 3+ distinct outbreaks the user explicitly asked to list.
 3. Always include specific numbers: cases, deaths, locations (state + district + village when available).
 4. Mention outbreak status (Under Control / Under Surveillance) when reporting an outbreak.
 5. If a death is reported, highlight it clearly.
-6. If the data isn't in the context, say so explicitly. Never invent numbers or locations.
+6. NEVER invent numbers, locations, dates, or outbreaks. If something is not in the context, say "not reported in the available data".
 7. For aggregation questions, lead with the total, then break it down by state/disease.
-8. Keep responses focused. Don't repeat back the user's question.`;
+8. Keep responses focused. Don't repeat back the user's question.
+9. When referring to a time period, mention the week number and year if available.
+10. If the user asks about a state, district, or disease that does NOT appear in the context, tell them clearly that no data was found for it. Do not substitute with similar-sounding alternatives.`;
+
+/* ─────────── Main entry ─────────── */
 
 export const askReportRag = async (question) => {
-  // 1. understand the question
-  const intent = await classifyIntent(question);
-  console.log("🎯 Intent:", intent);
-
-  // 2. aggregation path
-  if (intent.intent === "aggregation") {
-    const stats = await handleAggregation(intent);
-
-    if (stats.length > 0) {
-      const summary = stats.map(s =>
-        `${s._id.disease || "Unknown disease"} in ${s._id.state || "Unknown state"}: ${s.totalCases} cases, ${s.totalDeaths} deaths across ${s.outbreaks} outbreak(s) in districts [${s.districts.filter(Boolean).join(", ") || "unknown"}]`
-      ).join("\n");
-
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: `Aggregated statistics from IDSP reports:\n${summary}\n\nQuestion: ${question}` }
-        ],
-        temperature: 0.2,
-      });
-
-      return {
-        answer: completion.choices[0].message.content,
-        sources: stats.slice(0, 5),
-        mode: "aggregation",
-      };
-    }
-  }
-
-  // 3. semantic / lookup path
-  const topChunks = await vectorSearch(question, intent);
-
-  if (topChunks.length === 0) {
+  const totalChunks = await ReportChunk.countDocuments();
+  if (totalChunks === 0) {
     return {
-      answer: "I couldn't find relevant outbreak data for that question. Try specifying a state, district, or disease, or rephrasing your question.",
+      answer: "No outbreak reports have been uploaded yet. Please upload an IDSP report first.",
       sources: [],
-      mode: "semantic",
+      mode: "no_data",
     };
   }
 
-  const context = topChunks.map((c, i) =>
-    `[Source ${i + 1}] State: ${c.metadata.state || "N/A"} | District: ${c.metadata.district || "N/A"} | Disease: ${c.metadata.disease || "N/A"} | Cases: ${c.metadata.cases} | Deaths: ${c.metadata.deaths} | Status: ${c.metadata.status || "N/A"} | Start: ${c.metadata.startDate || "N/A"}\n${c.text}`
-  ).join("\n\n---\n\n");
+  const intent = await classifyIntent(question);
+  console.log("🎯 Intent:", intent);
+
+  const describeFilters = () => {
+    const parts = [];
+    if (intent.disease) parts.push(`disease: ${intent.disease}`);
+    if (intent.state) parts.push(`state: ${intent.state}`);
+    if (intent.district) parts.push(`district: ${intent.district}`);
+    if (intent.timeFrame === "specific_week" && intent.weekNumber) {
+      parts.push(intent.year
+        ? `week ${intent.weekNumber} of ${intent.year}`
+        : `week ${intent.weekNumber}`);
+    } else if (intent.timeFrame === "latest") {
+      parts.push("the latest week");
+    }
+    return parts.length ? parts.join(", ") : null;
+  };
+
+  /* ─────────── Aggregation path ─────────── */
+  if (intent.intent === "aggregation") {
+    const { results: stats, relaxed } = await handleAggregation(intent);
+
+    if (stats.length === 0) {
+      const filterDesc = describeFilters();
+      return {
+        answer: filterDesc
+          ? `No outbreak data found for ${filterDesc}. Try broadening your question (e.g. ask about a different state, disease, or time period).`
+          : "No outbreak data found matching your question.",
+        sources: [],
+        mode: "aggregation",
+        intent,
+      };
+    }
+
+    const summary = stats
+      .map(s => {
+        const weeks = s.weeks.filter(Boolean).sort((a, b) => a - b).join(", ");
+        const districts = s.districts.filter(Boolean).join(", ") || "unknown";
+        return `${s._id.disease || "Unknown disease"} in ${s._id.state || "Unknown state"}: ${s.totalCases} cases, ${s.totalDeaths} deaths across ${s.outbreaks} outbreak(s) | districts: [${districts}] | weeks: [${weeks}]`;
+      })
+      .join("\n");
+
+    const timeContext = relaxed === "time"
+      ? "Note: no data matched the exact time frame requested, so this answer covers all uploaded weeks."
+      : intent.timeFrame === "latest"
+      ? "Time scope: latest week available."
+      : intent.timeFrame === "all"
+      ? "Time scope: all uploaded reports combined."
+      : `Time scope: week ${intent.weekNumber}${intent.year ? ` of ${intent.year}` : ""}.`;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        {
+          role: "user",
+          content: `${timeContext}\n\nAggregated statistics from IDSP reports:\n${summary}\n\nQuestion: ${question}`,
+        },
+      ],
+      temperature: 0.2,
+    });
+
+    return {
+      answer: completion.choices[0].message.content,
+      sources: stats.slice(0, 5),
+      mode: "aggregation",
+      intent,
+      relaxed,
+    };
+  }
+
+  /* ─────────── Semantic / lookup path ─────────── */
+  const { results: topChunks, relaxed } = await vectorSearch(question, intent);
+
+  if (topChunks.length === 0) {
+    const filterDesc = describeFilters();
+
+    if (filterDesc) {
+      return {
+        answer: `No outbreak data found for ${filterDesc} in the uploaded reports. This could mean no outbreaks were reported there, or the relevant report hasn't been uploaded yet.`,
+        sources: [],
+        mode: "semantic",
+        intent,
+      };
+    }
+
+    return {
+      answer:
+        "I couldn't find anything relevant to your question in the uploaded outbreak reports. The reports cover specific disease outbreaks across Indian states — try asking about a particular disease, state, or district.",
+      sources: [],
+      mode: "semantic",
+      intent,
+    };
+  }
+
+  const relaxationNote = relaxed === "time"
+    ? "(Note: no data in the requested time frame, showing matches from all weeks.)\n\n"
+    : relaxed === "district+time"
+    ? "(Note: no data for that exact district/time, showing related state-level data.)\n\n"
+    : relaxed === "all_filters"
+    ? "(Note: no exact filter match, showing closest semantic results.)\n\n"
+    : "";
+
+  const context = topChunks
+    .map(
+      (c, i) =>
+        `[Source ${i + 1}] State: ${c.metadata.state || "N/A"} | District: ${c.metadata.district || "N/A"} | Disease: ${c.metadata.disease || "N/A"} | Cases: ${c.metadata.cases} | Deaths: ${c.metadata.deaths} | Status: ${c.metadata.status || "N/A"} | Start: ${c.metadata.startDate || "N/A"} | Week: ${c.metadata.weekNumber || "N/A"}/${c.metadata.year || "N/A"}\n${c.text}`
+    )
+    .join("\n\n---\n\n");
 
   const completion = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: `Context from IDSP reports:\n\n${context}\n\nQuestion: ${question}` }
+      { role: "user", content: `${relaxationNote}Context from IDSP reports:\n\n${context}\n\nQuestion: ${question}` },
     ],
     temperature: 0.2,
   });
@@ -183,10 +359,14 @@ export const askReportRag = async (question) => {
       reportId: c.reportId,
       disease: c.metadata.disease,
       location: `${c.metadata.district || ""}, ${c.metadata.state || ""}`.trim(),
+      week: c.metadata.weekNumber,
+      year: c.metadata.year,
       cases: c.metadata.cases,
       deaths: c.metadata.deaths,
       similarity: c.similarity.toFixed(3),
     })),
     mode: "semantic",
+    intent,
+    relaxed,
   };
 };

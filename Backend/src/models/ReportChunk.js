@@ -1,16 +1,15 @@
 import mongoose from "mongoose";
 
 const reportChunkSchema = new mongoose.Schema({
-  reportId: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: "Report", 
+  reportId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Report",
     required: true,
-    index: true 
+    index: true,
   },
   text: { type: String, required: true },
   embedding: { type: [Number], required: true },
-  
-  // 🔥 NEW: structured metadata for filtering
+
   metadata: {
     state: { type: String, index: true },
     district: { type: String, index: true },
@@ -20,17 +19,20 @@ const reportChunkSchema = new mongoose.Schema({
     startDate: String,
     status: String,
     uniqueId: String,
-    chunkType: { 
-      type: String, 
+    year: { type: Number, index: true },
+    weekNumber: { type: Number, index: true },
+    chunkType: {
+      type: String,
       enum: ["outbreak_entry", "summary", "header", "fallback"],
-      default: "outbreak_entry"
-    }
+      default: "outbreak_entry",
+    },
   },
-  
-  createdAt: { type: Date, default: Date.now }
+
+  createdAt: { type: Date, default: Date.now },
 });
 
-// compound index for filtered vector searches
+// compound indexes for filtered queries
 reportChunkSchema.index({ "metadata.state": 1, "metadata.disease": 1 });
+reportChunkSchema.index({ "metadata.year": -1, "metadata.weekNumber": -1 });
 
 export const ReportChunk = mongoose.model("ReportChunk", reportChunkSchema);

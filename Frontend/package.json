@@ -4,9 +4,12 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "leaflet": "^1.9.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.27.0"
+    "react-leaflet": "^4.2.1",
+    "react-router-dom": "^6.27.0",
+    "recharts": "^3.8.1"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",
