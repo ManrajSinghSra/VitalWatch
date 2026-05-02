@@ -47,21 +47,7 @@ export const uploadReport = async (req, res) => {
       uploadedBy: req.user._id,
     });
 
-    // 🔥🔥🔥 ADD THIS BLOCK (RAG ingestion)
-    console.log("🔥 Starting RAG ingestion...");
-
-    ingestReport(report)
-      .then(() => {
-        console.log(`✅ RAG processed: ${report.originalName}`);
-      })
-      .catch((err) => {
-        console.error("❌ RAG ingestion failed:", err.message);
-      });
-
-    // update superadmin stats
-    await incrementReportsProcessed();
-
-    // audit log
+    // audit log (do this BEFORE responding, so failure is logged synchronously)
     await AuditLog.create({
       level: "INFO",
       action: `Admin uploaded report: ${file.originalname}`,
@@ -69,8 +55,9 @@ export const uploadReport = async (req, res) => {
       performedById: req.user._id,
     });
 
-    return res.status(201).json({
-      message: "Report uploaded successfully",
+    // respond to client immediately — don't make them wait for ingestion
+    res.status(201).json({
+      message: "Report uploaded successfully. RAG ingestion in progress.",
       report: {
         id: report._id,
         originalName: report.originalName,
@@ -80,6 +67,33 @@ export const uploadReport = async (req, res) => {
         createdAt: report.createdAt,
       },
     });
+
+    // 🔥 RAG ingestion runs in background AFTER response is sent
+    // stats only increment if ingestion actually succeeds
+    console.log("🔥 Starting RAG ingestion in background...");
+
+    ingestReport(report)
+      .then(async () => {
+        console.log(`✅ RAG processed: ${report.originalName}`);
+        try {
+          await incrementReportsProcessed();
+        } catch (statErr) {
+          console.error("⚠️ Stats increment failed:", statErr.message);
+        }
+      })
+      .catch(async (err) => {
+        console.error(`❌ RAG ingestion failed for ${report.originalName}:`, err.message);
+        try {
+          await AuditLog.create({
+            level: "DANGER",
+            action: `RAG ingestion failed for ${report.originalName}: ${err.message}`,
+            performedBy: req.user.name,
+            performedById: req.user._id,
+          });
+        } catch (logErr) {
+          console.error("⚠️ Audit log for failed ingestion also failed:", logErr.message);
+        }
+      });
 
   } catch (err) {
     console.error("Upload error:", err);
