@@ -147,3 +147,4 @@ const res = await fetch("/api/chat", {
 
 VitalWatch is a **health awareness tool**, not a medical diagnostic tool.
 Always consult a qualified healthcare provider for medical concerns.
+hello 
