@@ -9,7 +9,7 @@ import { Badge, CardBox, CardHeader } from "../../components/ui";
 const API_URL = "http://localhost:6001";
 
 const USER_TABS = [
-  { key: "chat", label: "AI Chat" },
+  { key: "chat", label: "Mr.Vital" },
   { key: "alerts", label: "Alerts" },
   { key: "map", label: "Disease Map" },
   { key: "reports", label: "Reports" },
@@ -60,6 +60,7 @@ export default function UserDashboard() {
   const navigate = useNavigate();
   const [tab, setTab] = useState("chat");
   const [reports, setReports] = useState([]);
+  const [sosLoading, setSosLoading] = useState(false);
 
   useEffect(() => {
     const t1 = setTimeout(() => {
@@ -113,13 +114,48 @@ export default function UserDashboard() {
     navigate("/login");
   };
 
+  const openHospitalSearch = (query) => {
+    window.open(
+      `https://www.google.com/maps/search/${encodeURIComponent(query)}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
+  };
+
   const handleSOS = () => {
     toast({
       icon: "Emergency",
       title: "Emergency",
-      body: "Connecting to helpline...",
+      body: "Finding nearby hospitals...",
       urgent: true,
     });
+
+    if (!navigator.geolocation) {
+      openHospitalSearch(`hospitals near ${user?.location || "me"}`);
+      return;
+    }
+
+    setSosLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        setSosLoading(false);
+        openHospitalSearch(`hospitals near ${coords.latitude},${coords.longitude}`);
+      },
+      () => {
+        setSosLoading(false);
+        openHospitalSearch(`hospitals near ${user?.location || "me"}`);
+        toast({
+          icon: "Location",
+          title: "Location unavailable",
+          body: "Opened hospitals using your saved location instead.",
+        });
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000,
+      }
+    );
   };
 
   return (
@@ -297,10 +333,13 @@ export default function UserDashboard() {
           <button
             type="button"
             onClick={handleSOS}
-            className="w-full rounded-[28px] border border-rose-200 bg-rose-50/80 p-5 text-left shadow-[0_12px_28px_rgba(244,63,94,0.08)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_36px_rgba(244,63,94,0.12)] xl:max-w-[290px]"
+            disabled={sosLoading}
+            className="w-full rounded-[28px] border border-rose-200 bg-rose-50/80 p-5 text-left shadow-[0_12px_28px_rgba(244,63,94,0.08)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_36px_rgba(244,63,94,0.12)] disabled:cursor-wait disabled:opacity-80 xl:max-w-[290px]"
           >
             <div className="rounded-[18px] bg-[#fb4343] px-6 py-5 text-center text-white shadow-[0_14px_28px_rgba(251,67,67,0.24)]">
-              <p className="text-[1.05rem] font-black tracking-tight">🚨 SOS Emergency</p>
+              <p className="text-[1.05rem] font-black tracking-tight">
+                {sosLoading ? "Locating..." : "🚨 SOS Emergency"}
+              </p>
             </div>
             <p className="pt-4 text-center text-lg font-medium text-slate-500">Tap for nearest help</p>
           </button>

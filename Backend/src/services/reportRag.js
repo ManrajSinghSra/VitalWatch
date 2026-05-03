@@ -3,9 +3,21 @@ import { Report } from "../models/Report.js";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 import OpenAI from "openai";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+let openai;
+
+const getOpenAIClient = () => {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY is required to answer report questions");
+  }
+
+  if (!openai) {
+    openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+  }
+
+  return openai;
+};
 
 const MAX_REPORTS = 20;
 const TOP_CHUNKS = 5;
@@ -195,7 +207,7 @@ export const askReportRag = async (question, userLocation) => {
 
   const context = ranked.map(r => r.chunk).join("\n\n");
 
-  const completion = await openai.chat.completions.create({
+  const completion = await getOpenAIClient().chat.completions.create({
     model: "gpt-4o-mini",
     messages: [
       {
