@@ -50,7 +50,7 @@ export default function AlertsPanel() {
         </div>
       )}
 
-      <div className="max-h-96 overflow-y-auto">
+      <div className="max-h-96  overflow-y-auto">
       {!loading && alerts.map((a) => {
         const style = urgencyStyle[a.urgency] || urgencyStyle.info;
         return (

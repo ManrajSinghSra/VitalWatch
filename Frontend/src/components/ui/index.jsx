@@ -121,11 +121,13 @@ export function PrimaryBtn({ children, onClick, disabled, className = "", type =
   );
 }
 
-export function GhostBtn({ children, onClick, className = "" }) {
+export function GhostBtn({ children, onClick, disabled, className = "" }) {
   return (
     <button
+      type="button"
+      disabled={disabled}
       onClick={onClick}
-      className={`px-4 py-2 rounded-xl text-sm font-medium border border-edge hover:border-brand/40 hover:text-brand hover:bg-brand/5 text-slate-400 transition-all duration-150 ${className}`}
+      className={`px-4 py-2 rounded-xl text-sm font-medium border border-edge hover:border-brand/40 hover:text-brand hover:bg-brand/5 text-slate-400 disabled:cursor-not-allowed disabled:opacity-40 transition-all duration-150 ${className}`}
     >
       {children}
     </button>

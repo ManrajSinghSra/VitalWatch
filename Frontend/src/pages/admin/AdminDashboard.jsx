@@ -16,6 +16,8 @@ export default function AdminDashboard() {
   const [report,setReport]=useState([]);
   const [users, setUsers] = useState([]);
   const [error, setError] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0, fileName: "" });
 
   const authHeaders = () => {
     const token = localStorage.getItem("token");
@@ -60,26 +62,55 @@ export default function AdminDashboard() {
   useEffect(()=>{
     loadAdminData()
   },[])
+
+  const activeReportCount = report.filter((item) => ["uploaded", "processing"].includes(item.status)).length;
+  const isReportProcessing = uploading || activeReportCount > 0;
+
+  useEffect(() => {
+    if (!activeReportCount) return;
+
+    const interval = window.setInterval(() => {
+      getAllReports().catch((err) => setError(err.message));
+    }, 3000);
+
+    return () => window.clearInterval(interval);
+  }, [activeReportCount]);
  
 
   const handleFileUpload = async (e) => {
-        const selectedFile = e.target.files[0];
+        const selectedFiles = Array.from(e.target.files || []);
 
-        if (!selectedFile) return;
+        if (!selectedFiles.length || uploading) return;
 
-        const formData = new FormData();
-        formData.append("file", selectedFile);
+        setUploading(true);
+        setError("");
+        setUploadProgress({ current: 0, total: selectedFiles.length, fileName: selectedFiles[0].name });
 
         try {
-        await apiFetch("/admin/report/upload", {
-          method: "POST",
-          body: formData,
-        });
+          for (const [index, selectedFile] of selectedFiles.entries()) {
+            const formData = new FormData();
+            formData.append("file", selectedFile);
+            formData.append("source", "Other");
 
-        await getAllReports();
-        e.target.value = "";
+            setUploadProgress({
+              current: index + 1,
+              total: selectedFiles.length,
+              fileName: selectedFile.name,
+            });
+
+            await apiFetch("/admin/report/upload", {
+              method: "POST",
+              body: formData,
+            });
+          }
+
+          await getAllReports();
+          e.target.value = "";
         } catch (err) {
           setError(err.message);
+        } finally {
+          setUploading(false);
+          setUploadProgress({ current: 0, total: 0, fileName: "" });
         }
     };
 
@@ -233,15 +264,76 @@ export default function AdminDashboard() {
         {tab === "reports" && (
           <CardBox>
             <input type="file"  id="fileInput" className="hidden"
+              multiple
+              accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              disabled={isReportProcessing}
+              onChange={handleFileUpload}
+            />
+            <input type="file"  id="folderInput" className="hidden"
+              multiple
+              webkitdirectory=""
+              directory=""
+              accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              disabled={isReportProcessing}
               onChange={handleFileUpload}
             />
 
            <div className="flex justify-between items-center">
               <CardHeader title="Reports" />
-              <PrimaryBtn onClick={()=>document.getElementById("fileInput").click()}>
-                + Upload Report
-              </PrimaryBtn>
+              <div className="flex items-center gap-2">
+                <PrimaryBtn
+                  disabled={isReportProcessing}
+                  onClick={()=>document.getElementById("fileInput").click()}
+                >
+                  {isReportProcessing ? "Processing..." : "+ Upload Files"}
+                </PrimaryBtn>
+                <GhostBtn
+                  disabled={isReportProcessing}
+                  onClick={()=>document.getElementById("folderInput").click()}
+                  className="px-4 py-2.5 text-xs"
+                >
+                  Upload Folder
+                </GhostBtn>
+              </div>
           </div>
+
+            {isReportProcessing && (
+              <div className="m-4 overflow-hidden rounded-2xl border border-cyan-200 bg-gradient-to-r from-cyan-50 via-white to-emerald-50 p-4 shadow-inner">
+                <div className="flex items-center gap-4">
+                  <div className="relative h-14 w-14 flex-shrink-0">
+                    <span className="absolute inset-0 rounded-2xl bg-cyan-300/30 animate-ping" />
+                    <span className="absolute inset-1 rounded-2xl bg-white shadow-sm" />
+                    <span className="absolute inset-0 flex items-center justify-center text-2xl">📄</span>
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="truncate text-sm font-bold text-slate-800">
+                        {uploading ? "Uploading reports" : "Analyzing uploaded report"}
+                      </p>
+                      <span className="rounded-full bg-cyan-100 px-2.5 py-1 text-[11px] font-bold text-cyan-700">
+                        Please wait
+                      </span>
+                    </div>
+                    <p className="mt-1 truncate text-xs text-slate-500">
+                      {uploading
+                        ? `${uploadProgress.current}/${uploadProgress.total} ${uploadProgress.fileName}`
+                        : `${activeReportCount} report${activeReportCount === 1 ? "" : "s"} moving through ingestion`}
+                    </p>
+                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-cyan-400 via-emerald-400 to-cyan-400 transition-all duration-500"
+                        style={{
+                          width: uploading && uploadProgress.total
+                            ? `${Math.max(12, Math.round((uploadProgress.current / uploadProgress.total) * 100))}%`
+                            : "70%",
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
 
             {report.map(r => (
