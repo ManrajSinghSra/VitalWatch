@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import Navbar from "../../components/layout/Navbar";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
+import { DashboardBackdrop, DashboardHeader, DashboardMotionStyles } from "../../components/dashboard/DashboardChrome";
 import { AvatarCircle, Badge, CardBox, CardHeader, GhostBtn, PrimaryBtn, StatCard } from "../../components/ui";
 
 const API_URL = "http://localhost:6001";
@@ -125,6 +127,8 @@ function UserTable({ users, onPromote, onDemote, onBanToggle, onDelete, busyId }
 }
 
 export default function SuperAdminDashboard() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [tab, setTab] = useState("overview");
   const [stats, setStats] = useState(defaultStats);
   const [users, setUsers] = useState([]);
@@ -194,17 +198,30 @@ export default function SuperAdminDashboard() {
     runUserAction(userId, `/superadmin/delete/${userId}`, { method: "DELETE" });
   };
 
-  return (
-    <div className="min-h-screen bg-[#f4f9fd] flex flex-col">
-      <Navbar tabs={SA_TABS} activeTab={tab} onTabChange={setTab} />
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
 
-      <main className="mx-auto w-full max-w-[1280px] flex-1 px-8 py-8">
-        <div className="mb-8 flex items-center justify-between">
+  return (
+    <div className="relative isolate flex min-h-screen flex-col overflow-x-hidden bg-slate-50 text-slate-800">
+      <DashboardMotionStyles />
+      <DashboardBackdrop />
+      <DashboardHeader
+        tabs={SA_TABS}
+        activeTab={tab}
+        onTabChange={setTab}
+        userName={user?.name?.split(" ")[0] || "Super"}
+        onLogout={handleLogout}
+      />
+
+      <main className="relative z-10 mx-auto w-full max-w-[1280px] flex-1 px-8 py-8">
+        <div className="mb-8 flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
           <div>
             <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-purple-300 bg-purple-50 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-purple-600">
               Super Admin Full Control
             </div>
-            <h1 className="text-3xl font-black tracking-tight text-slate-900">
+            <h1 className="text-4xl font-black leading-tight text-slate-900">
               {tab === "overview" && "Platform Overview"}
               {tab === "users" && "All Users"}
               {tab === "admins" && "Admin Management"}

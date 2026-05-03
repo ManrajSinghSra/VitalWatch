@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
-import Navbar from "../../components/layout/Navbar";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
+import { DashboardBackdrop, DashboardHeader, DashboardMotionStyles } from "../../components/dashboard/DashboardChrome";
 import { StatCard, Badge, CardBox, CardHeader, AvatarCircle, PrimaryBtn, GhostBtn } from "../../components/ui";
 
 const API_URL = "http://localhost:6001";
@@ -12,6 +14,8 @@ const ADMIN_TABS = [
 ];
 
 export default function AdminDashboard() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [tab, setTab] = useState("overview");
   const [report,setReport]=useState([]);
   const [users, setUsers] = useState([]);
@@ -111,6 +115,11 @@ export default function AdminDashboard() {
     window.open(`${API_URL}/admin/report/download/${id}`, "_blank");
   };
 
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
+
   const sourceRows = [...new Map(report.map((item) => [item.source || "Other", item])).keys()].map((source) => ({
     source,
     count: report.filter((item) => (item.source || "Other") === source).length,
@@ -122,21 +131,28 @@ export default function AdminDashboard() {
   }));
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col">
+    <div className="relative isolate flex min-h-screen flex-col overflow-x-hidden bg-slate-50 text-slate-800">
+      <DashboardMotionStyles />
+      <DashboardBackdrop />
+      <DashboardHeader
+        tabs={ADMIN_TABS}
+        activeTab={tab}
+        onTabChange={setTab}
+        userName={user?.name?.split(" ")[0] || "Admin"}
+        onLogout={handleLogout}
+      />
 
-      <Navbar tabs={ADMIN_TABS} activeTab={tab} onTabChange={setTab} />
-
-      <div className="px-8 py-8 max-w-[1280px] mx-auto w-full flex-1">
+      <div className="relative z-10 mx-auto w-full max-w-[1280px] flex-1 px-8 py-8">
  
-        <div className="flex justify-between mb-8">
+        <div className="mb-8 flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
           <div>
-            <div className="bg-yellow-100 border border-yellow-200 text-yellow-700 px-3 py-1 text-xs rounded-full inline-block mb-3">
+            <div className="mb-3 inline-block rounded-full border border-yellow-200 bg-yellow-100 px-3 py-1 text-xs font-semibold uppercase text-yellow-700">
               🛠️ Admin Panel
             </div>
 
-            <h1 className="text-3xl font-bold">System Overview</h1>
+            <h1 className="text-4xl font-black leading-tight text-slate-900">System Overview</h1>
 
-            <p className="text-slate-600 text-sm">
+            <p className="mt-2 text-sm text-slate-600">
               Manage users, reports, and alerts.
             </p>
           </div>
@@ -154,14 +170,14 @@ export default function AdminDashboard() {
           <div className="flex flex-col gap-6">
 
             {/* Stats */}
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <StatCard label="Users" value={users.length} accent="cyan" />
               <StatCard label="Alerts" value="6" accent="red" />
               <StatCard label="Reports" value={report.length} accent="emerald" />
               <StatCard label="Sources" value={new Set(report.map((r) => r.source)).size || 0} accent="yellow" />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-4 lg:grid-cols-2">
 
               <CardBox>
                 <CardHeader title="Reports by Source" />

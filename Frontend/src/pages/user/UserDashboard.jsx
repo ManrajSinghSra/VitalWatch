@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import ChatWindow from "../../components/chat/ChatWindow";
+import { DashboardHeader } from "../../components/dashboard/DashboardChrome";
 import { DataSourcesPanel, DiseaseSidebar, OutbreakMap, WeeklyTrend } from "../../components/dashboard/DashWidgets";
 import { toast } from "../../components/ui/Toast";
 import { Badge, CardBox, CardHeader } from "../../components/ui";
@@ -236,69 +237,13 @@ export default function UserDashboard() {
         ))}
       </div>
 
-      <div className="relative z-10 px-6 pt-5 md:px-8">
-        <header className="mx-auto flex w-full max-w-[1280px] flex-col gap-4 rounded-[30px] border border-white/70 bg-white/55 px-5 py-3.5 shadow-[0_18px_70px_rgba(148,184,197,0.18)] backdrop-blur-xl lg:flex-row lg:items-center lg:justify-between lg:px-6">
-          <button
-            type="button"
-            onClick={() => navigate("/")}
-            className="flex items-center gap-4 text-left"
-          >
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-cyan-100 bg-gradient-to-br from-cyan-50 to-sky-100 shadow-inner shadow-white/60">
-              <span className="text-2xl">VS</span>
-            </div>
-
-            <div>
-              <div className="text-[2rem] font-black leading-none tracking-tight text-slate-800">
-                Vital<span className="text-teal-500">Watch</span>
-              </div>
-              <p className="mt-2 text-[0.7rem] font-bold uppercase tracking-[0.42em] text-slate-500">
-                Predictive Health Signal
-              </p>
-            </div>
-          </button>
-
-          <div className="flex w-full justify-center lg:w-auto">
-            <div className="flex w-full max-w-[560px] items-center gap-2 rounded-full border border-slate-200/90 bg-white/80 p-2 shadow-inner shadow-slate-100 lg:w-auto">
-              {USER_TABS.map(({ key, label }) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setTab(key)}
-                  className={`flex-1 rounded-full px-5 py-3 text-[11px] font-bold uppercase tracking-[0.28em] transition-all duration-200 md:text-sm ${
-                    tab === key
-                      ? "bg-slate-900 text-white shadow-[0_10px_25px_rgba(15,23,42,0.16)]"
-                      : "text-slate-500 hover:bg-slate-100 hover:text-slate-800"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex items-center justify-end gap-3 whitespace-nowrap">
-            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-bold uppercase tracking-[0.28em] text-emerald-600">
-              <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
-              Live
-            </div>
-
-            <button
-              type="button"
-              className="rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-            >
-              {firstName}
-            </button>
-
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="rounded-full bg-gradient-to-r from-cyan-500 to-teal-500 px-7 py-3 text-sm font-bold text-white shadow-[0_14px_30px_rgba(20,184,166,0.28)] transition hover:-translate-y-px hover:shadow-[0_18px_34px_rgba(20,184,166,0.34)]"
-            >
-              Sign Out
-            </button>
-          </div>
-        </header>
-      </div>
+      <DashboardHeader
+        tabs={USER_TABS}
+        activeTab={tab}
+        onTabChange={setTab}
+        userName={firstName}
+        onLogout={handleLogout}
+      />
 
       <div className="relative z-10 mx-auto w-full max-w-[1280px] px-8 py-8">
         <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,1fr)_auto_290px]">
