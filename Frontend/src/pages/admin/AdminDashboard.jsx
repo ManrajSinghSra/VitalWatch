@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import Navbar from "../../components/layout/Navbar";
 import { StatCard, Badge, CardBox, CardHeader, AvatarCircle, PrimaryBtn, GhostBtn } from "../../components/ui";
+import AnimatedMedicalBackground from "../../components/layout/AnimatedMedicalBackground";
 
 const API_URL = "http://localhost:6001";
 
@@ -153,15 +154,16 @@ export default function AdminDashboard() {
   }));
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col">
+    <div className="relative isolate min-h-screen overflow-x-hidden bg-slate-50 text-slate-800 flex flex-col">
+      <AnimatedMedicalBackground />
 
       <Navbar tabs={ADMIN_TABS} activeTab={tab} onTabChange={setTab} />
 
-      <div className="px-8 py-8 max-w-[1280px] mx-auto w-full flex-1">
+      <div className="relative z-10 px-8 py-8 max-w-[1280px] mx-auto w-full flex-1">
  
-        <div className="flex justify-between mb-8">
+        <div className="mb-8 flex flex-col gap-4 rounded-[30px] border border-white/70 bg-white/55 p-6 shadow-[0_18px_70px_rgba(148,184,197,0.18)] backdrop-blur-xl md:flex-row md:items-center md:justify-between">
           <div>
-            <div className="bg-yellow-100 border border-yellow-200 text-yellow-700 px-3 py-1 text-xs rounded-full inline-block mb-3">
+            <div className="bg-yellow-100 border border-yellow-200 text-yellow-700 px-3 py-1 text-xs rounded-full inline-block mb-3 uppercase tracking-widest font-bold">
               🛠️ Admin Panel
             </div>
 

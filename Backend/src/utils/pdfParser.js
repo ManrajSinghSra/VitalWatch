@@ -3,7 +3,7 @@ import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 export const extractPdfText = async (buffer) => {
   try {
     const loadingTask = pdfjsLib.getDocument({
-      data: new Uint8Array(buffer), // 🔥 FIX HERE
+      data: new Uint8Array(buffer),  
     });
 
     const pdf = await loadingTask.promise;

@@ -1,4 +1,3 @@
-// routers/reportProcessing.js
 import { Router } from "express";
 import multer from "multer";
 import {
@@ -26,8 +25,7 @@ const upload = multer({
 });
 
 export const reportRouter = Router();
- 
-// reportRouter.post("/upload", verifyToken, isAdmin, upload.single("file"), uploadFile);
+  
  
 reportRouter.get("/all", getAllReports);
  

@@ -4,24 +4,20 @@ import { Report } from "../models/Report.js";
 import { AuditLog } from "../models/AuditLog.js";
 import { getBucket } from "../db/gridfs.js";
 import { incrementReportsProcessed } from "../utils/updateStats.js";
-import { ingestReport } from "../services/rag/ingest.service.js"; // 🔥 ADDED
+import { ingestReport } from "../services/rag/ingest.service.js";  
 
 const hasAdminPermission = (user, permission) => {
   if (user?.role === "superadmin") return true;
   return user?.hasPermission?.(permission) === true;
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// POST /admin/report/upload
-// ─────────────────────────────────────────────────────────────────────────────
+ 
 export const uploadReport = async (req, res) => {
   try {
     const file = req.file;
     if (!file) return res.status(400).json({ message: "No file uploaded" });
 
     const { source = "Other", description = "" } = req.body;
-
-    // stream buffer → GridFS
+ 
     const bucket = getBucket();
     const readableStream = Readable.from(file.buffer);
     const uploadStream = bucket.openUploadStream(file.originalname, {
@@ -34,8 +30,7 @@ export const uploadReport = async (req, res) => {
       uploadStream.on("finish", resolve);
       uploadStream.on("error", reject);
     });
-
-    // save metadata to reports collection
+ 
     const report = await Report.create({
       originalName: file.originalname,
       gridfsFileId: uploadStream.id,
@@ -46,16 +41,14 @@ export const uploadReport = async (req, res) => {
       status: "uploaded",
       uploadedBy: req.user._id,
     });
-
-    // audit log (do this BEFORE responding, so failure is logged synchronously)
+ 
     await AuditLog.create({
       level: "INFO",
       action: `Admin uploaded report: ${file.originalname}`,
       performedBy: req.user.name,
       performedById: req.user._id,
     });
-
-    // respond to client immediately — don't make them wait for ingestion
+ 
     res.status(201).json({
       message: "Report uploaded successfully. RAG ingestion in progress.",
       report: {
@@ -67,9 +60,7 @@ export const uploadReport = async (req, res) => {
         createdAt: report.createdAt,
       },
     });
-
-    // 🔥 RAG ingestion runs in background AFTER response is sent
-    // stats only increment if ingestion actually succeeds
+  
     console.log("🔥 Starting RAG ingestion in background...");
 
     ingestReport(report)
@@ -103,10 +94,7 @@ export const uploadReport = async (req, res) => {
     });
   }
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// GET /admin/report/all
-// ─────────────────────────────────────────────────────────────────────────────
+ 
 export const getAllReports = async (req, res) => {
   try {
     const reports = await Report.find()
@@ -119,10 +107,7 @@ export const getAllReports = async (req, res) => {
     return res.status(500).json({ message: "Failed to fetch reports" });
   }
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// GET /admin/report/download/:id
-// ─────────────────────────────────────────────────────────────────────────────
+ 
 export const downloadReport = async (req, res) => {
   try {
     const report = await Report.findById(req.params.id);
@@ -145,10 +130,7 @@ export const downloadReport = async (req, res) => {
     return res.status(500).json({ message: "Download failed" });
   }
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// PATCH /admin/report/:id/status
-// ─────────────────────────────────────────────────────────────────────────────
+ 
 export const updateReportStatus = async (req, res) => {
   try {
     const { status } = req.body;
@@ -179,10 +161,7 @@ export const updateReportStatus = async (req, res) => {
     return res.status(500).json({ message: "Status update failed" });
   }
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// DELETE /admin/report/:id
-// ─────────────────────────────────────────────────────────────────────────────
+ 
 export const deleteReport = async (req, res) => {
   try {
     const report = await Report.findById(req.params.id);
@@ -210,10 +189,7 @@ export const deleteReport = async (req, res) => {
     return res.status(500).json({ message: "Delete failed" });
   }
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// GET /admin/users
-// ─────────────────────────────────────────────────────────────────────────────
+ 
 export const getAllUsers = async (req, res) => {
   try {
     if (!hasAdminPermission(req.user, "canViewUsers")) {

@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import Navbar from "../../components/layout/Navbar";
 import { AvatarCircle, Badge, CardBox, CardHeader, GhostBtn, PrimaryBtn, StatCard } from "../../components/ui";
+import AnimatedMedicalBackground from "../../components/layout/AnimatedMedicalBackground";
 
 const API_URL = "http://localhost:6001";
 
 const SA_TABS = [
-  { key: "overview", label: "Overview", icon: "Crown" },
-  { key: "users", label: "All Users", icon: "Users" },
-  { key: "admins", label: "Admins", icon: "Admin" },
-  { key: "logs", label: "Audit Logs", icon: "Logs" },
+  { key: "overview", label: "Overview" },
+  { key: "users", label: "All Users" },
+  { key: "admins", label: "Admins" },
+  { key: "logs", label: "Audit Logs" },
 ];
 
 const ROLE_BADGE = { user: "info", admin: "warn", superadmin: "purple" };
@@ -195,11 +196,12 @@ export default function SuperAdminDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f4f9fd] flex flex-col">
+    <div className="relative isolate min-h-screen overflow-x-hidden bg-slate-50 flex flex-col">
+      <AnimatedMedicalBackground />
       <Navbar tabs={SA_TABS} activeTab={tab} onTabChange={setTab} />
 
-      <main className="mx-auto w-full max-w-[1280px] flex-1 px-8 py-8">
-        <div className="mb-8 flex items-center justify-between">
+      <main className="relative z-10 mx-auto w-full max-w-[1280px] flex-1 px-8 py-8">
+        <div className="mb-8 flex flex-col gap-4 rounded-[30px] border border-white/70 bg-white/55 p-6 shadow-[0_18px_70px_rgba(148,184,197,0.18)] backdrop-blur-xl md:flex-row md:items-center md:justify-between">
           <div>
             <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-purple-300 bg-purple-50 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-purple-600">
               Super Admin Full Control

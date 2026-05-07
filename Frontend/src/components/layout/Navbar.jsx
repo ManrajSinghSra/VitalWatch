@@ -1,12 +1,12 @@
-// src/components/layout/Navbar.jsx
-import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 import { AvatarCircle } from "../ui";
+import BrandLogo from "./BrandLogo";
 
 const ROLE_META = {
-  user:       { label: "Public User",  color: "text-cyan-400",    bg: "bg-cyan-400/10 border-cyan-400/20"    },
-  admin:      { label: "Admin",        color: "text-yellow-400",  bg: "bg-yellow-400/10 border-yellow-400/20" },
-  superadmin: { label: "Super Admin",  color: "text-purple-400",  bg: "bg-purple-400/10 border-purple-400/20" },
+  user: { label: "Public User", color: "text-cyan-600", bg: "bg-cyan-50 border-cyan-200" },
+  admin: { label: "Admin", color: "text-amber-600", bg: "bg-amber-50 border-amber-200" },
+  superadmin: { label: "Super Admin", color: "text-violet-600", bg: "bg-violet-50 border-violet-200" },
 };
 
 export default function Navbar({ tabs = [], activeTab, onTabChange }) {
@@ -14,71 +14,73 @@ export default function Navbar({ tabs = [], activeTab, onTabChange }) {
   const navigate = useNavigate();
   const meta = user ? ROLE_META[user.role] : null;
 
-  const handleLogout = () => { logout(); navigate("/login"); };
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
 
   return (
-    <nav className="sticky top-0 z-50 flex items-center justify-between px-8 h-16 bg-[#030a0f]/90 backdrop-blur-xl border-b border-edge">
-      {/* Logo */}
-      <div
-        className="flex items-center gap-2.5 cursor-pointer"
-        onClick={() => navigate("/")}
-      >
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-emerald-400 flex items-center justify-center text-sm">🛡️</div>
-        <span className="font-black text-xl tracking-tight font-head text-white">
-          Vital<span className="text-cyan-400">Watch</span>
-        </span>
-        {meta && (
-          <span className={`hidden md:inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full border ${meta.bg} ${meta.color} ml-1`}>
-            {meta.label}
-          </span>
-        )}
-      </div>
+    <nav className="sticky top-0 z-50 border-b border-cyan-100/80 bg-cyan-50/80 px-6 py-4 shadow-[0_18px_60px_rgba(8,145,178,0.08)] backdrop-blur-xl">
+      <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <button type="button" className="text-left" onClick={() => navigate("/")}>
+          <BrandLogo />
+        </button>
 
-      {/* Tab Links */}
-      {tabs.length > 0 && (
-        <div className="hidden md:flex items-center gap-1">
-          {tabs.map(({ key, label, icon }) => (
-            <button
-              key={key}
-              onClick={() => onTabChange?.(key)}
-              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-150 ${
-                activeTab === key
-                  ? "text-cyan-400 bg-cyan-400/10"
-                  : "text-slate-400 hover:text-cyan-400 hover:bg-cyan-400/5"
-              }`}
-            >
-              <span>{icon}</span> {label}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Right: Live + User */}
-      <div className="flex items-center gap-3">
-        <div className="hidden sm:flex items-center gap-1.5 text-xs font-medium text-emerald-400 bg-emerald-400/8 border border-emerald-400/20 px-2.5 py-1 rounded-full">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" />
-          Live
-        </div>
-
-        {user && (
-          <div className="flex items-center gap-2 group relative">
-            <AvatarCircle name={user.name} size="sm" />
-            <div className="hidden sm:block">
-              <p className="text-xs font-semibold text-white leading-tight">{user.name}</p>
-              <p className={`text-xs ${meta.color}`}>{meta.label}</p>
-            </div>
-            {/* Dropdown */}
-            <div className="absolute right-0 top-full mt-2 w-44 bg-night-2 border border-edge rounded-xl overflow-hidden opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 shadow-xl z-50">
-              <div className="px-3 py-2.5 border-b border-edge">
-                <p className="text-xs font-semibold text-white">{user.name}</p>
-                <p className="text-xs text-slate-500">{user.email}</p>
-              </div>
-              <button onClick={handleLogout} className="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-red-500/8 transition-colors">
-                🚪 Sign Out
+        {tabs.length > 0 && (
+          <div className="flex flex-wrap items-center justify-center gap-1.5 rounded-full border border-slate-200/90 bg-white/80 p-2 shadow-inner shadow-slate-100 lg:flex-nowrap">
+            {tabs.map(({ key, label, icon }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => onTabChange?.(key)}
+                className={`flex items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-4 py-2 text-[11px] font-bold uppercase tracking-[0.18em] transition-all duration-200 ${
+                  activeTab === key
+                    ? "bg-slate-900 text-white shadow-[0_10px_24px_rgba(15,23,42,0.14)]"
+                    : "text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                }`}
+              >
+                {icon && <span className="text-xs">{icon}</span>}
+                {label}
               </button>
-            </div>
+            ))}
           </div>
         )}
+
+        <div className="flex items-center gap-3">
+          <div className="hidden items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-5 py-3 text-xs font-bold uppercase tracking-[0.24em] text-emerald-600 sm:flex">
+            <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
+            LIVE
+          </div>
+
+          {user && (
+            <div className="group relative flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-3 py-2 shadow-sm">
+              <AvatarCircle name={user.name} size="sm" />
+              <div className="hidden sm:block">
+                <p className="text-xs font-semibold leading-tight text-slate-800">{user.name}</p>
+                <p className={`text-xs ${meta?.color || "text-slate-500"}`}>{meta?.label}</p>
+              </div>
+
+              <div className="invisible absolute right-0 top-full z-50 mt-2 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white opacity-0 shadow-xl transition-all duration-150 group-hover:visible group-hover:opacity-100">
+                <div className="border-b border-slate-200 px-3 py-2.5">
+                  <p className="text-xs font-semibold text-slate-800">{user.name}</p>
+                  <p className="text-xs text-slate-500">{user.email}</p>
+                  {meta && (
+                    <span className={`mt-2 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${meta.bg} ${meta.color}`}>
+                      {meta.label}
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="w-full px-3 py-2 text-left text-xs font-semibold text-red-500 transition-colors hover:bg-red-50"
+                >
+                  Sign Out
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </nav>
   );

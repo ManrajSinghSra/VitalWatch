@@ -17,3 +17,5 @@ build/
 # OS junk
 .DS_Store
 Thumbs.db
+CODEBASE_API_REPORT.md
+PROJECT_PROGRESS_REPORT.md

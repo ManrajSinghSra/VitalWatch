@@ -29,9 +29,7 @@ const splitIntoBlocks = (rawText) => {
     .map(b => b.trim().slice(0, 2500));
 };
 
-/**
- * Extract metadata for a batch with manual retries on top of SDK retries.
- */
+ 
 const extractMetadataBatch = async (blocks, attempt = 1) => {
   const MAX_ATTEMPTS = 4;
 
@@ -119,17 +117,13 @@ ${numbered}`;
     return extractMetadataBatch(blocks, attempt + 1);
   }
 };
-
-/**
- * Main export: split + extract → returns chunks ready for embedding.
- */
+ 
 export const extractOutbreakChunks = async (rawText) => {
   const blocks = splitIntoBlocks(rawText);
   console.log(`📑 Split into ${blocks.length} outbreak blocks`);
 
   if (blocks.length === 0) return [];
-
-  // 🔥 Smaller batches = faster individual calls = less timeout risk
+ 
   const BATCH_SIZE = 5;
   const allMetadata = [];
 

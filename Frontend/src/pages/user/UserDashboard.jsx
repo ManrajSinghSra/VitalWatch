@@ -6,11 +6,12 @@ import { DataSourcesPanel, DiseaseSidebar, OutbreakMap, WeeklyTrend } from "../.
 import { toast } from "../../components/ui/Toast";
 import { Badge, CardBox, CardHeader } from "../../components/ui";
 import AlertsPanel from "../../components/AlertsPanel";
+import BrandLogo from "../../components/layout/BrandLogo";
 
 const API_URL = "http://localhost:6001";
 
 const USER_TABS = [
-  { key: "chat", label: "AI Chat" },
+  { key: "chat", label: "Mr.Vital" },
   { key: "alerts", label: "Alerts" },
   { key: "map", label: "Disease Map" },
   { key: "reports", label: "Reports" },
@@ -166,12 +167,27 @@ export default function UserDashboard() {
   };
 
   const handleSOS = () => {
+    const fallbackQuery = user?.location ? `hospitals near ${user.location}` : "hospitals near me";
+    const buildMapsUrl = (query) => `https://www.google.com/maps/search/${encodeURIComponent(query)}`;
+    const mapsTab = window.open(buildMapsUrl(fallbackQuery), "_blank");
+
     toast({
       icon: "Emergency",
       title: "Emergency",
-      body: "Connecting to helpline...",
+      body: "Opening nearby hospitals...",
       urgent: true,
     });
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        ({ coords }) => {
+          const gpsUrl = buildMapsUrl(`hospitals near ${coords.latitude},${coords.longitude}`);
+          if (mapsTab && !mapsTab.closed) mapsTab.location.href = gpsUrl;
+        },
+        () => {},
+        { enableHighAccuracy: true, timeout: 6000, maximumAge: 300000 }
+      );
+    }
   };
 
   return (
@@ -259,18 +275,7 @@ export default function UserDashboard() {
             onClick={() => navigate("/")}
             className="flex items-center gap-4 text-left"
           >
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-cyan-100 bg-gradient-to-br from-cyan-50 to-sky-100 shadow-inner shadow-white/60">
-              <span className="text-2xl">VS</span>
-            </div>
-
-            <div>
-              <div className="text-[2rem] font-black leading-none tracking-tight text-slate-800">
-                Vital<span className="text-teal-500">Watch</span>
-              </div>
-              <p className="mt-2 text-[0.7rem] font-bold uppercase tracking-[0.42em] text-slate-500">
-                Predictive Health Signal
-              </p>
-            </div>
+            <BrandLogo />
           </button>
 
           <div className="flex w-full justify-center lg:w-auto">

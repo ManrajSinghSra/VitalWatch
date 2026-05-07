@@ -7,12 +7,7 @@ const openai = new OpenAI({
 });
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-
-/**
- * Get embedding for a single string.
- * Handles transient failures with manual exponential backoff
- * on top of the SDK's built-in retries.
- */
+ 
 export const getEmbedding = async (text, attempt = 1) => {
   const MAX_ATTEMPTS = 4;
   
@@ -33,12 +28,7 @@ export const getEmbedding = async (text, attempt = 1) => {
     return getEmbedding(text, attempt + 1);
   }
 };
-
-/**
- * Batch embed multiple texts in a single API call.
- * MUCH faster than one-at-a-time and uses fewer requests.
- * OpenAI allows up to 2048 inputs per call.
- */
+ 
 export const getEmbeddingsBatch = async (texts, attempt = 1) => {
   const MAX_ATTEMPTS = 4;
   
@@ -46,8 +36,7 @@ export const getEmbeddingsBatch = async (texts, attempt = 1) => {
     const res = await openai.embeddings.create({
       model: "text-embedding-3-small",
       input: texts,
-    });
-    // results come back in the same order as inputs
+    }); 
     return res.data.map(d => d.embedding);
   } catch (err) {
     if (attempt >= MAX_ATTEMPTS) {
